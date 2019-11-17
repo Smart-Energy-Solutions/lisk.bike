@@ -50,7 +50,7 @@ const bikeaccount = JSON.parse(fs.readFileSync('./accounts/'+process.argv[2]+'.j
 
 if(undefined==bikeaccount) { console.log("Bicycle account not found"); return; }
 
-console.log("Bike %s will be locked", bikeaccount);
+console.log("Bike %s will be locked", bikeaccount.address);
 
 returnbike(bikeaccount)
 .catch(error => {
