@@ -30,13 +30,13 @@ const returnbike = async (bikeaccount) => {
   longitude = prevlongitude + Math.random() / 100;
 
   asset.location = {longitude,latitude};
-  asset.prevlocation = {prevlongitude,prevlatitude};
+  asset.prevlocation = {prevlongitude, prevlatitude};
 
   const tx = new ReturnBikeTransaction({
       asset,
-      // amount: transactions.utils.convertLSKToBeddows(bikeDeposit.toString()),
+      // amount: "0.1",// Give back the txfee to the renter
       senderPublicKey: bikeaccount.publicKey,
-      recipientId: bikeaccount.address,
+      recipientId: account.asset.rentedBy,
       timestamp: getTimestamp(),
   });
 

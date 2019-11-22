@@ -4,6 +4,12 @@ This is a technology demonstrator for the Lisk (Alpha) SDK. In this repository y
 
 The code is based on @JesusTheHun's work in [github.com/JesusTheHun/lisk-bike](https://github.com/JesusTheHun/lisk-bike)
 
+At #liskjs2019 we presented the Proof of Concept of Lisk.Bike in Berlin.
+
+- [Check out the presentation](https://docs.google.com/presentation/d/14NrJQS3tUTtCGq5uG5zca0h_Oa6p5FoIiqkif20womc/edit#slide=id.p)
+- [Check out the workshop](https://github.com/liskcenterutrecht/lisk.bike/wiki/lisk.bike-workshop-instructions)
+- Join [Blockchain030 Discord](https://discord.gg/xvxXf8P) to contact the team
+
 # Overview: the process flow
 
 ## Preparing the blockchain
