@@ -196,7 +196,7 @@ class Info extends Component {
               <li>Bart</li>
               <li>Albert</li>
               <li>Susanne</li>
-              <li>Jesus</li>
+              <li>JesusTheHun</li>
               <li>Joost</li>
             </ul>
           </div>
