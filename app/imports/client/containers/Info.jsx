@@ -177,7 +177,7 @@ class Info extends Component {
           </div>
           <div className={classes.spotlightcentered}>
             <p><b>We asked the community for 5000 LSK to build this Proof of Concept.</b></p>
-            <p><b>Your Lisk donations to wallet address 11629240136553438599L made this project possible.</b></p>
+            <p><b>Your Lisk donations to wallet address 12011343856710933463L made this project possible.</b></p>
             <p><b>THANK YOU</b></p>
           </div>
           <div className={classes.explainer}>
