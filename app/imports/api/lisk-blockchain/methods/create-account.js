@@ -44,12 +44,10 @@ const createAccount = (providerUrl, addFunds=true, mnemonic='') => {
       client.transactions.broadcast(tx.toJSON())
         .then((res) => {
           // console.log('res', res)
-          // alert(JSON.stringify(res));
           resolve(account);
         })
         .catch(err => {
-          console.log('createaccount - err %o', err)
-          alert(JSON.stringify(err.errors[0].message));
+          console.error('createaccount - err %o', err)
           reject(account);
         });
     })

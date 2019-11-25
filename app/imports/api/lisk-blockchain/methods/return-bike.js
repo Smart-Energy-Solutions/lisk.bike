@@ -54,7 +54,7 @@ const doReturnBike = async (renterAccount, bikeAddress, location, prevlocation) 
   returnResult.then(result => {
       // console.log(result)
   }, (err) => {
-      alert(err)
+      console.error("doReturnBike - error %o", err);
   })
 
   return returnResult;

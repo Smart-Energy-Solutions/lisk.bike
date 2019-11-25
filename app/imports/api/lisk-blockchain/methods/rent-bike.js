@@ -40,7 +40,7 @@ const doRentBike = async (renterAccount, bikeAddress, bikeDeposit) => {
   rentResult.then(result => {
       // console.log(result)
   }, (err) => {
-      alert(err.errors[0].message)
+      console.error("doRentBike - error %o", err);
   })
 
   return rentResult;

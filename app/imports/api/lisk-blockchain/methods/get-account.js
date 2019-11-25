@@ -11,8 +11,7 @@ const getAccount = (providerUrl, address) => {
         resolve(res.data);
       })
       .catch(err => {
-        alert(JSON.stringify(err.errors[0].message));
-        console.log('err', err)
+        console.log('getAccount - error %o', err)
         reject(err);
       });
   })
