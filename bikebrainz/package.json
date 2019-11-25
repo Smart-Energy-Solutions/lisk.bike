@@ -9,5 +9,12 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "crc16-itu": "^1.0.6",
+    "dateformat": "^3.0.3",
+    "isomorphic-ws": "^4.0.1",
+    "simpleddp": "^2.2.4",
+    "ws": "^7.2.0"
+  }
 }

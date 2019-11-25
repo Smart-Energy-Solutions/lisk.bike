@@ -45,11 +45,14 @@ const crc16 = require('crc16-itu')
 const dateFormat = require('dateformat');
 const fs = require('fs');
 
+var bl10 = {};
+
+
 // createSendCommand()
 //
 // For documentation, see:
 // 'BL10 GPS tracker communication protocolV1.0.8  20180408.pdf'
-export const createSendCommand = (command) => {
+bl10.createSendCommand = (command) => {
   let messageCount = 1;
 
   const startBit = new Buffer([0x78, 0x78]);
@@ -104,7 +107,7 @@ export const createSendCommand = (command) => {
 
 }
 
-const processInfoContent = (cmd, infocontent, serialNo, socket) => {
+bl10.processInfoContent = async (cmd, infocontent, serialNo, socket, meteorserver = undefined) => {
   // console.log("==== processing %s/%s", cmd, infocontent)
   if(cmd=='01') { // process login command -> should always come first
     // TODO: decode timezone info
@@ -117,13 +120,14 @@ const processInfoContent = (cmd, infocontent, serialNo, socket) => {
     }
   }
   
-  // let theLock = Objects.findOne({'lock.locktype': 'concox-bl10', 'lock.lockid': socket.lockid});
-  // if(theLock!=undefined) {
-  //   console.log('found the lock! HURRAY HURRAY HURRAY! [%s]', socket.lockid);
-  // } else {
-  //   console.log('incoming info from undefined lock %s', socket.lockid);
-  // }
-  let theLock = {};
+  let theLocks = await meteorserver.collection("Objects").find({'lock.locktype': 'concox-bl10', 'lock.lockid': socket.lockid}).fetch();
+  let theLock=undefined;
+  if(theLocks.length==1) theLock = theLocks[0];
+  if(theLock!=undefined) {
+    console.log('found the lock! HURRAY HURRAY HURRAY! [%s]', socket.lockid);
+  } else {
+    console.log('incoming info from undefined lock %s', socket.lockid);
+  }
   
   let lastts = dateFormat(new Date(), 'yymmddHHMMss', true);
   let lastserial =  serialNo;
@@ -227,7 +231,7 @@ const processInfoContent = (cmd, infocontent, serialNo, socket) => {
         // } else if(cmd=='33') {
         //
         // }
-        if(gpsinfo.infolength>0)
+        if(gpsinfo.infolength>0) {
         // if(theLock!=undefined&&gpsinfo.infolength>0) {
         //   Objects.update(theLock._id, {$set: {
         //     'lock.lat_lng': [gpsinfo.latitude, gpsinfo.longitude],
@@ -290,24 +294,23 @@ const processInfoContent = (cmd, infocontent, serialNo, socket) => {
 
     // if(parseInt(serialNo)%100==2) {
     //   // console.log("++++++++++asking for location+++++++++++++++++++++++++++++++++");
-    //   // socket.write(createSendCommand('RESET#')); // reboot lock
-    //   // socket.write(createSendCommand('PARAM#'));
-    //   // socket.write(createSendCommand('LJDW#'));
-    //   // socket.write(createSendCommand('WHERE#'));
-    //   // socket.write(createSendCommand('GTIMER,3#'));
-    //   // socket.write(createSendCommand('GPSON#'));
-    //   // socket.write(createSendCommand('GTIMER#'));
-    //   // socket.write(createSendCommand('LJDW#'));
+    //   // socket.write(bl10.createSendCommand('RESET#')); // reboot lock
+    //   // socket.write(bl10.createSendCommand('PARAM#'));
+    //   // socket.write(bl10.createSendCommand('LJDW#'));
+    //   // socket.write(bl10.createSendCommand('WHERE#'));
+    //   // socket.write(bl10.createSendCommand('GTIMER,3#'));
+    //   // socket.write(bl10.createSendCommand('GPSON#'));
+    //   // socket.write(bl10.createSendCommand('GTIMER#'));
+    //   // socket.write(bl10.createSendCommand('LJDW#'));
     // }
     // if(parseInt(serialNo)%100==5) {
-    //   socket.write(createSendCommand('LJDW#'));
+    //   socket.write(bl10.createSendCommand('LJDW#'));
     // }
     
   }
 }
 
-export const processSinglePacket = (socket, buf) => {
-  
+bl10.processSinglePacket = async (socket, buf, meteorserver = undefined) => {
   let cmd = '';
   let length = 0;
   let infocontent = '';
@@ -332,10 +335,12 @@ export const processSinglePacket = (socket, buf) => {
   console.log('got %s / l: %s / actual: %s', cmd, length, buf.length);
   
   if(serialNo!='') {
-    processInfoContent(cmd, infocontent, serialNo, socket)
+    await bl10.processInfoContent(cmd, infocontent, serialNo, socket, meteorserver)
     let line = socket.lockid + ";" + serialNo + ";" + cmd + ";" + infocontent+"\n";
     fs.appendFile('received-commands.txt', line, function (err) {
       if (err) throw err;
     });
   }
 }
+
+module.exports = bl10;
