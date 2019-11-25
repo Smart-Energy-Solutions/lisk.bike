@@ -167,15 +167,6 @@ class OverviewPageClient extends Component {
   }
 }
 
-var s = {
-  base: {
-    padding: '10px 20px'
-  },
-  paragraph: {
-    padding: '0 20px'
-  }
-}
-
 OverviewPageClient.propTypes = {
   settings: PropTypes.any,
   objects:  PropTypes.any,

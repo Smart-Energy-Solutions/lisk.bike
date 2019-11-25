@@ -28,6 +28,11 @@ const listbikes = async (showdetails) => {
       description += ' [' + transactions.utils.convertBeddowsToLSK(account.balance) + ' LSK]'
       if(account.asset) {
         description+= ' - ' + (account.asset.rentedBy!='' ? util.format("rented by %s", account.asset.rentedBy) : 'available');
+        if(account.asset.location) {
+          description+= util.format(" @ [%s, %s]", account.asset.location.latitude, account.asset.location.longitude);
+        } else {
+          description+= ' @ unknown location'
+        }
       } else {
         description+= ' - no account info available';
       }

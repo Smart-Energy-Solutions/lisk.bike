@@ -1,43 +1,54 @@
 const { APIClient } = require('@liskhq/lisk-client');
-const ReturnBikeTransaction = require('../transactions/return-bike');
-const { getSettingsClientSide } = require('/imports/api/settings.js');
 const { getTimestamp, getBike } = require('../_helpers.js');
+const ReturnBikeTransaction = require('../transactions/return-bike');
 const transactions = require('@liskhq/lisk-transactions');
+const { getSettingsClientSide } = require('/imports/api/settings.js');
 
 import { Promise } from 'meteor/promise';
 
-const returnBike = async (client, bikeAddress, renterAccount, location, prevlocation) => {
-  
-    let asset = {
-        id: bikeAddress,
-    }
+const returnBike = async (client, bikeaccount, latitude=undefined, longitude=undefined) => {
+    // find the bike info on the blockchain
+    console.log("bikeaccount %o", bikeaccount);
+    console.log("returnBike method %o", latitude, longitude)
     
-    if(location.longitude==undefined) {
-      location={longitude:51,latitude:0};
-      prevlocation={longitude:51,latitude:0};
+    let account = undefined;
+    let accountlist = await client.accounts.get({address:bikeaccount.address});
+    if(accountlist.data.length==1) {
+      account = accountlist.data[0];
+    } else {
+      console.log("bike account not found. Please try again");
+      return false;
     }
 
-    if(location!=false&&prevlocation!=false) {
-      asset.location = location;
-      asset.prevlocation = prevlocation;
+    let asset = {
+        id: bikeaccount.address,
     }
+    
+    let prevlatitude = account.asset.location ? account.asset.location.latitude : 0;
+    let prevlongitude = account.asset.location ? account.asset.location.longitude : 0;
+    
+    if(undefined==latitude) latitude=prevlatitude;
+    if(undefined==longitude) longitude=prevlongitude;
+    
+    asset.location = {latitude, longitude};
+    asset.prevlocation = {prevlatitude, prevlongitude};
+    
+    console.log("setting asset location to %o", asset.location);
 
     const tx = new ReturnBikeTransaction({
         asset,
-        // amount: transactions.utils.convertLSKToBeddows(bikeDeposit.toString()),
-        senderPublicKey: renterAccount.publicKey,
-        recipientId: bikeAddress,
+        // amount: "0.1",// Give back the txfee to the renter
+        senderPublicKey: bikeaccount.publicKey,
+        recipientId: account.asset.rentedBy,
         timestamp: getTimestamp(),
     });
 
-    tx.sign(renterAccount.passphrase);
+    tx.sign(bikeaccount.passphrase);
     
-    console.log(tx);
-
     return await client.transactions.broadcast(tx.toJSON());
 }
 
-const doReturnBike = async (renterAccount, bikeAddress, location, prevlocation) => {
+const doReturnBike = async (bikeaccount, latitude=undefined, longitude=undefined) => {
   const settings = await getSettingsClientSide();
   if(!settings) return false;
 
@@ -46,10 +57,9 @@ const doReturnBike = async (renterAccount, bikeAddress, location, prevlocation) 
 
   const returnResult = returnBike(
       client,
-      bikeAddress,
-      renterAccount,
-      location,
-      prevlocation
+      bikeaccount,
+      latitude,
+      longitude
   );
   returnResult.then(result => {
       // console.log(result)

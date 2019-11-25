@@ -21,8 +21,8 @@ class UpdateBikeLocationTransaction extends BaseTransaction {
 
         const validId = BikeValidator.id(this.id, this.asset.id);
         const validLocation = BikeValidator.location(this.id, {
-            latitude: this.asset.latitude,
-            longitude: this.asset.longitude,
+            latitude: this.asset.location.latitude,
+            longitude: this.asset.location.longitude,
         });
 
         if (validId !== true) {
@@ -67,7 +67,7 @@ class UpdateBikeLocationTransaction extends BaseTransaction {
         //   }
         // };
         
-        object.asset.location = { latitude: this.asset.latitude, longitude: this.asset.longitude };
+        object.asset.location = { latitude: this.asset.location.latitude, longitude: this.asset.location.longitude };
 
         store.account.set(this.asset.id, object);
 
@@ -78,8 +78,8 @@ class UpdateBikeLocationTransaction extends BaseTransaction {
         const errors = [];
         const object = store.account.get(this.asset.id);
 
-        // object.location.latitude = this.asset.previousLatitude;
-        // object.location.longitude = this.asset.previousLongitude;
+        object.location.latitude = this.asset.prevlocation.latitude;
+        object.location.longitude = this.asset.prevlocation.longitude;
 
         store.account.set(this.asset.id, object);
 

@@ -1,6 +1,6 @@
 require('dotenv').config()
 const { APIClient } = require('@liskhq/lisk-client');
-const { prefix, getTimestamp, getProviderURL } = require('../_helpers.js');
+const { getTimestamp, getProviderURL } = require('../_helpers.js');
 const ReturnBikeTransaction = require('../transactions/return-bike');
 const transactions = require('@liskhq/lisk-transactions');
 const fs = require('fs');
@@ -43,6 +43,12 @@ const returnbike = async (bikeaccount) => {
   tx.sign(bikeaccount.passphrase);
   
   return await client.transactions.broadcast(tx.toJSON());
+}
+
+if(process.argv.length!=3) {
+  console.log("You need to specify the bike account to return the bike");
+  console.log("usage node return-bike.test.js <bicycle account name>");
+  return;
 }
 
 // Get 'accounts'

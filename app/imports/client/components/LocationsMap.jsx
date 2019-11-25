@@ -51,21 +51,6 @@ class LocationsMap extends Component {
       zoomControl: true// Hide zoom buttons
     });
 
-    // Start geocoding
-    let geocoder = new google.maps.Geocoder();
-    let googleGeocoding = (text, callResponse) => geocoder.geocode({address: text}, callResponse);
-
-    // Now add the search control
-    // map.addControl( new L.Control.Search({
-    //   position: 'topleft',
-    //   sourceData: googleGeocoding,
-    //   formatData: this.formatJSON,
-    //   markerLocation: true,
-    //   autoType: false,
-    //   autoCollapse: true,
-    //   minLength: 2
-    // }) );
-
     // Add a leyer for search elements
     let markersLayer = new L.LayerGroup();
     map.addLayer(markersLayer);

@@ -331,8 +331,18 @@ if(Meteor.isServer) {
       
       return { result: true, message: 'registration transaction has been sent to the blockchain!'}
     },
-    'objects.lockBike'(renterAccount, bikeAddress, location, prevlocation) {
-      doReturnBike(renterAccount, bikeAddress, location, prevlocation).then(res => {
+    'objects.lockBikeUsingAddress'(bikeAddress, latitude, longitude) {
+      // find corresponding bike account
+      let bikeobject = Objects.findOne({'wallet.address': bikeAddress});
+      if(bikeobject==undefined) {
+        console.error()
+        return {
+          result: true,
+          message: 'Unable to return this bicycle! This is not one of my bicycles.'
+        }
+      }
+      
+      doReturnBike(bikeobject.wallet, latitude, longitude).then(res => {
         console.log(res)
       }).catch(err => {
         console.error(err)
@@ -342,7 +352,28 @@ if(Meteor.isServer) {
         message: 'Bike locked.'
       }
     },
-    'objects.updateBikeLocation'(bikeAddress, latitude, longitude) {
+    'objects.lockBikeUsingLockId'(lockid, latitude, longitude) {
+      // find corresponding bike account
+      let bikeobject = Objects.find({'lock.lockid': lockid});
+      if(bikeobject==undefined) {
+        console.error()
+        return {
+          result: true,
+          message: 'Unable to return this bicycle! This is not one of my bicycles.'
+        }
+      }
+      
+      doReturnBike(bikeobject.wallet, latitude, longitude).then(res => {
+        console.log(res)
+      }).catch(err => {
+        console.error(err)
+      });
+      return {
+        result: true,
+        message: 'Bike locked.'
+      }
+    },
+    'objects.updateBikeLocationUsingAddress'(bikeAddress, latitude, longitude) {
       doServerUpdateBikeLocation(bikeAddress, latitude, longitude);
     },
   });

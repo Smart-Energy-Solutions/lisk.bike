@@ -68,10 +68,10 @@ class ReturnBikeTransaction extends TransferTransaction {
         object.asset.rentedBy = "";
 
         if(this.asset.location!=false) {
-          object.asset.location=this.asset.location
+          object.asset.location={ latitude: this.asset.location.latitude, longitude: this.asset.location.longitude }
         }
 
-        // Update users balance
+        // Update users balance and location
         store.account.set(this.recipientId, {...recipient, balance: newRenterBalance});
 
         // Store bike object

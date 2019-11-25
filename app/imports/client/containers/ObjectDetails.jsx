@@ -12,7 +12,6 @@ import Typography from '@material-ui/core/Typography';
 import Button from '@material-ui/core/Button';
 
 import RentBikeButton from '/imports/client/components/RentBikeButton';
-import ReturnBikeButton from '/imports/client/components/ReturnBikeButton';
 import { getObjectStatus } from '/imports/api/lisk-blockchain/methods/get-object-status.js';
 import MiniMap from '/imports/client/components/MiniMap';
 
@@ -50,41 +49,17 @@ const styles = theme => ({
     '-ms-user-select': 'none',
     'user-select': 'none',
     backgroundColor: 'white',
-    color: 'black'
+    color: 'black',
   },
   actionbutton: {
-    width: '50vw',
+    width: '20vh',
     height: '30px',
     margin: '1vmin'
   },
-  base: {
-    fontSize: 'default',
-    lineHeight: 'default',
-    padding: '20px 20px 0 20px',
-    textAlign: 'center',
-    minHeight: 'calc(100vh - 74px)',
-    display: 'flex',
-    justifyContent: 'space-below',
-    flexDirection: 'column'
-  },
-  list: {
-    margin: '0 auto',
-    padding: 0,
-    textAlign: 'center',
-    listStyle: 'none',
-  },
-  listitem: {
-    padding: '0 10px 0 0',
-    margin: '0 auto',
-    textAlign: 'center',
-    minHeight: '40px',
-    fontSize: '1.2em',
-    fontWeight: '500',
-    listStyle: 'none',
-  },
-  mediumFont: {
-    fontSize: '2em',
-    fontWeight: '1000',
+  infodiv: {
+    backgroundColor: 'white',
+    color: 'black',
+    marginBottom: '1vmin'
   }
 });
 
@@ -176,14 +151,6 @@ class ObjectDetails extends Component {
           <Typography variant="h4" style={{backgroundColor: 'white', color: 'black'}}>
             {status.title}
           </Typography>
-          
-          <div align="center" hidden={unlocked == true}>
-            Do you want to rent me?
-            I cost {pricePerHourInLsk} BikeCoin per hour.
-            To rent me, you need at least {depositInLsk} BikeCoin as deposit.
-          </div>
-
-          <br/>
 
           <div hidden>
             <Typography variant="h6" style={{backgroundColor: 'white', color: 'black'}}>{objectId}</Typography>
@@ -194,16 +161,31 @@ class ObjectDetails extends Component {
           </div>
   
           { unlocked==true ?
-                <div align="center" variant="subtitle1" style={{backgroundColor: 'white', color: 'black'}}>
-                  Rented by {
-                    status.rentedBy
-                  }. Click LOCK to stop renting.<br /><br />
-                </div>
+                <>
+                  <div align="center" variant="subtitle1" className={classes.infodiv}>
+                    Rented by {status.rentedBy}.
+                  </div>
+                  <div align="center" variant="subtitle1" className={classes.infodiv}>
+                    Move the map around to simulate a bike ride.
+                  </div>
+                  <div align="center" variant="subtitle1" className={classes.infodiv}>
+                    Click LOCK to stop renting.
+                  </div>
+                </>
               :
-                null
+              <>
+                <div align="center" variant="subtitle1" className={classes.infodiv}>
+                  Do you want to rent me?
+                </div>
+                <div align="center" variant="subtitle1" className={classes.infodiv}>
+                  I cost {pricePerHourInLsk} BikeCoin per hour.
+                </div>
+                <div align="center" variant="subtitle1" className={classes.infodiv}>
+                  To rent me, you need at least {depositInLsk} BikeCoin as deposit.
+                </div>
+                <RentBikeButton bikeId={this.props.objectId} depositInLSK={deposit} classes={classes} isDisabled={unlocked} />
+              </>
           }
-
-          <RentBikeButton bikeId={this.props.objectId} depositInLSK={deposit} classes={classes} isDisabled={unlocked} />
         </div>
       </div>
     );

@@ -3,3 +3,4 @@ node_modules/
 npm-debug.log
 .vscode
 .backup/tmp-store-local
+imports/api/lisk-blockchain/tests/accounts/

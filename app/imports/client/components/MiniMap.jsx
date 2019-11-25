@@ -1,48 +1,51 @@
 import React, { Component, createRef} from 'react';
 
 import PropTypes from 'prop-types';
-import { withTracker } from 'meteor/react-meteor-data';
 import { withStyles } from '@material-ui/core/styles';
-import { ClientStorage } from 'ClientStorage';
-
-import { Settings, getSettingsClientSide } from '/imports/api/settings.js';
 
 import Typography from '@material-ui/core/Typography';
 import Button from '@material-ui/core/Button';
 
-import RentBikeButton from '/imports/client/components/RentBikeButton';
-import ReturnBikeButton from '/imports/client/components/ReturnBikeButton';
-import { getObjectStatus } from '/imports/api/lisk-blockchain/methods/get-object-status.js';
-
-import { Map, TileLayer, Marker, Popup } from 'react-leaflet';
+import { Map, TileLayer, Marker } from 'react-leaflet';
 import { geolocated } from "react-geolocated";
-
-import { Objects } from '/imports/api/objects.js';
 
 const styles = theme => ({
   root: {
+    boxSizing: 'border-box',
     position: 'relative',
     width: '100%',
     height: '50vmin',
     background: 'transparent',
     margin: '1vmin',
-    border: '1px solid black'
+    display: 'flex',
+    flexDirection: 'column'
   },
   map: {
+    boxSizing: 'border-box',
+    flex: '1 1 auto',
+    border: '1px solid black',
     width: '100%',
     height: 'calc(100% - 40px)',
   },
   mapLocked: {
+    boxSizing: 'border-box',
+    flex: '1 1 auto',
+    border: '1px solid black',
     width: '100%',
     height: '100%',
   },
   buttonbar: {
+    boxSizing: 'border-box',
+    flex: '0 0 auto',
+    height: '5vh',
     display: 'flex',
     flexdirection: 'row',
     justifyContent: 'space-around'
   },
   button: {
+    boxSizing: 'border-box',
     margin: '1vmin',
+    height: '2.8vh',
     fontSize: 'x-small'
   }
 });
@@ -106,29 +109,32 @@ class MiniMap extends Component {
     this.setState((prevstate) => ({ mapcenter: this.state.objectpos }))
   }
   
-  moveBike = (bikeAddress) => {
-    this.setState({ objectpos: this.state.mapcenter })
-
-    Meteor.call('objects.updateBikeLocation', this.props.bikeAddress, this.state.mapcenter[0], this.state.mapcenter[1])
-  }
-  
-  returnBike = (bikeAddress) => {
+  moveBike = () => {
     if(! Meteor.user) {
       alert('No user account found. Please wait a bit or reload the page.');
       return;
     }
-    const renterAccount = ClientStorage.get('user-wallet')
-    const location = { latitude:this.state.mapcenter[0], longitude:this.state.mapcenter[1] }
-    const prevlocation = { latitude:this.props.lat_lng[0], longitude:this.props.lat_lng[1] }
-    
-    Meteor.call('objects.lockBike', renterAccount, bikeAddress, location, prevlocation );
+
+    this.setState({ objectpos: this.state.mapcenter })
+
+    let latitude = this.state.mapcenter[0];
+    let longitude = this.state.mapcenter[1];
+    Meteor.call('objects.updateBikeLocationUsingAddress', this.props.bikeAddress, latitude, longitude );
   }
   
   lockBike = () => {
+    if(! Meteor.user) {
+      alert('No user account found. Please wait a bit or reload the page.');
+      return;
+    }
+
     this.setState({ objectpos: this.state.mapcenter })
     const bikeAddress = this.props.bikeAddress;
+
     // We end the rental. This will lock the bike.
-    this.returnBike(bikeAddress)
+    let latitude = this.state.mapcenter[0];
+    let longitude = this.state.mapcenter[1];
+    Meteor.call('objects.lockBikeUsingAddress', this.props.bikeAddress, latitude, longitude );
   }
   
   render() {
@@ -163,6 +169,7 @@ class MiniMap extends Component {
                   null
               }
               <Button className={classes.button} variant="contained" onClick={this.findBike.bind(this)}>FIND</Button>
+              <Button className={classes.button} variant="contained" onClick={this.moveBike.bind(this)}>MOVE</Button>
               <Button className={classes.button} variant="contained" onClick={this.lockBike.bind(this)}>LOCK</Button>
             </div>
           :
@@ -173,7 +180,6 @@ class MiniMap extends Component {
     
     // TODO: implement move button -> works only for bikes that are locally created
     // because we need the wallet info: can't move someone else's bikes (can't sign transaction)
-    // <Button className={classes.button} variant="contained" onClick={this.moveBike.bind(this)}>MOVE</Button>
 
     // <Typography variant="h6">{'[' + objectpos[0] + ', '+  objectpos[1] + ']'}</Typography>
   }

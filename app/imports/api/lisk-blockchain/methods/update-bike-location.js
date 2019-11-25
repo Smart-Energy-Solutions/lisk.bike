@@ -6,57 +6,65 @@ const transactions = require('@liskhq/lisk-transactions');
 
 import { Promise } from 'meteor/promise';
 
-const updateBikeLocation = async (client, bikeAccount, prevLatitude, prevLongitude, newLatitude, newLongitude) => {
+const updateBikeLocation = async (client, bikeaccount, latitude, longitude) => {
+  // find the bike info on the blockchain
+  console.log("bikeaccount %o", bikeaccount);
+  console.log("returnBike method %o", latitude, longitude)
+  
+  let account = undefined;
+  let accountlist = await client.accounts.get({address:bikeaccount.address});
+  if(accountlist.data.length==1) {
+    account = accountlist.data[0];
+  } else {
+    console.log("bike account not found. Please try again");
+    return false;
+  }
 
-    const tx = new UpdateBikeLocationTransaction({
-        asset: {
-            id: bikeAccount.address, // XXX or use bike.address
-            previousLatitude: Number(prevLatitude).toString(),
-            previousLongitude: Number(prevLongitude).toString(),
-            latitude: Number(newLatitude).toString(),
-            longitude: Number(newLongitude).toString(),
-        },
-        amount: 0, // transactions.utils.convertLSKToBeddows(bikeDeposit.toString()),
-        senderPublicKey: bikeAccount.publicKey,
-        recipientId: bikeAccount.address,
-        timestamp: getTimestamp(),
-    });
+  let asset = {
+      id: bikeaccount.address,
+  }
+  
+  let prevlatitude = account.asset.location ? account.asset.location.latitude : 0;
+  let prevlongitude = account.asset.location ? account.asset.location.longitude : 0;
+  
+  if(undefined==latitude) latitude=prevlatitude;
+  if(undefined==longitude) longitude=prevlongitude;
+  
+  asset.location = {latitude, longitude};
+  asset.prevlocation = {prevlatitude, prevlongitude};
 
-    tx.sign(bikeAccount.passphrase);
-    console.log(tx);
+  const tx = new UpdateBikeLocationTransaction({
+      asset,
+      amount: 0, // transactions.utils.convertLSKToBeddows(bikeDeposit.toString()),
+      senderPublicKey: bikeaccount.publicKey,
+      recipientId: bikeaccount.address,
+      timestamp: getTimestamp(),
+  });
 
-    return client.transactions.broadcast(tx.toJSON())
+  tx.sign(bikeaccount.passphrase);
+
+  return await client.transactions.broadcast(tx.toJSON());
 }
 
-const doUpdateBikeLocation = async (bikeAccount, newLatitude, newLongitude) => {
+const doUpdateBikeLocation = async (bikeaccount, latitude, longitude) => {
   const settings = await getSettingsClientSide();
   if(! settings) return false;
 
   const client = new APIClient([settings.bikecoin.provider_url]);
   if(! client) return false;
   
-  // fetch current bike info from the blockchain
-  let bikestatus = await client.accounts.get({address:bikeAccount.address});
-  if(bikestatus.data.length!=1) {
-    return false;
-  }
-  
-  let oldlocation = bikestatus.data[0].asset.location || {latitude:0, longitude:0};
-  
-  const result = updateBikeLocation(
+  const returnResult = updateBikeLocation(
         client,
-        bikeAccount,
-        oldlocation.latitude,
-        oldlocation.longitude,
-        newLatitude,
-        newLongitude);
-  result.then(result => {
+        bikeaccount,
+        latitude,
+        longitude);
+  returnResult.then(result => {
       // console.log(result)
   }, (err) => {
       console.error(err.errors[0].message)
   })
 
-  return result;
+  return returnResult;
 }
 
 module.exports = {doUpdateBikeLocation}

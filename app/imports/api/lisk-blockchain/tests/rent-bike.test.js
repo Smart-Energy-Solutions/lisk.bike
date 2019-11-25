@@ -1,6 +1,6 @@
 require('dotenv').config()
 const { APIClient } = require('@liskhq/lisk-client');
-const { prefix, getTimestamp, getProviderURL } = require('../_helpers.js');
+const { getTimestamp, getProviderURL } = require('../_helpers.js');
 const RentBikeTransaction = require('../transactions/rent-bike');
 const transactions = require('@liskhq/lisk-transactions');
 const fs = require('fs');
@@ -36,7 +36,7 @@ const rentbike = async (renteraccount, bikeaddress) => {
 
 if(process.argv.length!=4) {
   console.log("You need two accounts to rent a bike (owner + bicycle)");
-  console.log("usage node create-bike-test.js <owner account name> <bicycle account name>");
+  console.log("usage node create-bike.test.js <owner account name> <bicycle account name>");
   return;
 }
 

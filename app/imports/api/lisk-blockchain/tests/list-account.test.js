@@ -69,7 +69,7 @@ const listaccount = async (address, showdetails) => {
 
 if(process.argv.length<3) {
   console.log("You need to specify an account or address to get account info");
-  console.log("usage node list-accoint.test.js <account name / address> [<details>]");
+  console.log("usage node list-account.test.js <account name / address> [<details>]");
   return;
 }
 

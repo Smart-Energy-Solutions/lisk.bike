@@ -13,7 +13,7 @@ const client = new APIClient([getProviderURL()]);
 
 if(process.argv.length!=4) {
   console.log("You need two accounts to create a bike (owner + bicycle)");
-  console.log("usage node create-bike-test.js <owner account name> <bicycle account name>");
+  console.log("usage node create-bike.test.js <owner account name> <bicycle account name>");
   return;
 }
 
