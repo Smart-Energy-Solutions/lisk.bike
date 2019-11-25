@@ -1,0 +1,13 @@
+{
+  "name": "bikebrainz",
+  "version": "1.0.0",
+  "description": "test code for bl10 transaction processing",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "startdev": "nodemon --watch ../app/server/api --watch .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
