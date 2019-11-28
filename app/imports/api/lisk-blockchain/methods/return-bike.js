@@ -8,8 +8,8 @@ import { Promise } from 'meteor/promise';
 
 const returnBike = async (client, bikeaccount, latitude=undefined, longitude=undefined) => {
     // find the bike info on the blockchain
-    console.log("bikeaccount %o", bikeaccount);
-    console.log("returnBike method %o", latitude, longitude)
+    // console.log("bikeaccount %o", bikeaccount);
+    // console.log("returnBike method %o", latitude, longitude)
     
     let account = undefined;
     let accountlist = await client.accounts.get({address:bikeaccount.address});

@@ -106,6 +106,7 @@ export const LockSchema = new SimpleSchema({
   },
   battery: {
     type: Number,
+    decimal: true,
     label: "Battery Voltage",
   },
   charging: {
@@ -196,13 +197,13 @@ if(Meteor.isServer) {
     let object = Objects.findOne({'wallet.address': bikeAddress});
     
     if(object==undefined) {
+      console.log('no object found with address %s', bikeAddress);
+      
       return {
         result: true,
         message: 'You can only move your own bikes!'
       }
     }
-    
-    console.log("object %s / %o", bikeAddress, object)
     
     doUpdateBikeLocation(object.wallet, newLatitude, newLongitude).then(res => {
       console.log(res)
@@ -217,6 +218,68 @@ if(Meteor.isServer) {
     
     return ;
   }
+  
+  const doApplyChanges = (_id, changes, apitoken=false) => {
+    // Make sure the user is logged in or an api token is specified
+    // TODO: create api token field in object, use that token
+    if ((! Meteor.userId())&&apitoken!="keepcycling!!") {
+      console.log('incoming request from anonymous user rejected');
+      throw new Meteor.Error('not-authorized');
+    }
+    
+    let object = Objects.findOne(_id);
+    if(object) {
+      let title = (changes['blockchain.title'] || object.blockchain && object.blockchain.title || "unnamed object");
+      
+      // if(object.title!=title && "title" in changes == false) {
+      //   // blockchain title is leading
+      //   changes['title'] = title
+      // }
+      
+      SimpleSchema.debug = true
+      var context =  ObjectsSchema.newContext();
+      if(context.validate({ $set: changes}, {modifier: true} )) {
+        // apply changes
+        Objects.update(_id, {$set: Object.assign({},
+          changes,
+        )});
+        console.log('Object ' + title + ' updated');
+
+        return {
+          result: object,
+          message: 'Object ' + title + ' updated',
+          id: object._id
+        }
+      } else {
+        console.log("invalid data %s", JSON.stringify(context,0,2));
+        
+        return {
+          result: false,
+          message: 'Object ' + title + ' contains invalid data',
+          id: object._id
+        }
+      };
+    } else {
+      // make sure that no object exists with same title / category
+      object = Objects.findOne({'blockchain.title': changes.title})
+      if(object) {
+        return {
+          result: object,
+          message: 'There is already an object with this title registered (' + changes.title + ')',
+          id: object._id
+        }
+      }
+      
+      object = Object.assign({}, createObject(), changes);
+      Objects.insert(object);
+      return {
+        result: object,
+        message: 'Object ' + changes.title + ' created',
+      }
+    }
+  }
+
+  
 
   Meteor.methods({
     'objects.createnew'() {
@@ -226,55 +289,7 @@ if(Meteor.isServer) {
       return { _id: newId }
     },
     'objects.applychanges'(_id, changes) {
-      console.log("incoming applychanges %o for object %s", changes, _id)
-
-      // Make sure the user is logged in
-      if (! Meteor.userId()) throw new Meteor.Error('not-authorized');
-      
-      let object = Objects.findOne(_id);
-      if(object) {
-        let title = (changes['blockchain.title'] || object.blockchain && object.blockchain.title || "unnamed object");
-        var context =  ObjectsSchema.newContext();
-        console.log('changes')
-        console.log(changes)
-        if(context.validate({ $set: changes}, {modifier: true} )) {
-          // apply changes
-          Objects.update(_id, {$set: Object.assign({},
-            changes,
-            { title: changes['blockchain.title'] }
-          )});
-          console.log('Settings changed for ' + title);
-
-          return {
-            result: object,
-            message: 'Object ' + title + ' updated',
-            id: object._id
-          }
-        } else {
-          return {
-            result: false,
-            message: 'Object ' + title + ' contains invalid data',
-            id: object._id
-          }
-        };
-      } else {
-        // make sure that no object exists with same title / category
-        object = Objects.findOne({'blockchain.title': changes.title})
-        if(object) {
-          return {
-            result: object,
-            message: 'There is already an object with this title registered (' + changes.title + ')',
-            id: object._id
-          }
-        }
-        
-        object = Object.assign({}, createObject(), changes);
-        Objects.insert(object);
-        return {
-          result: object,
-          message: 'Object ' + changes.title + ' created',
-        }
-      }
+      return doApplyChanges(_id, changes);
     },
     'objects.remove'(objectId){
       var object = Objects.findOne(objectId);
@@ -294,7 +309,6 @@ if(Meteor.isServer) {
         return { result: false, message: 'please provide a description for this object!'}
       }
       
-      // Objects.update(objectId, {$set: {'blockchain.id': 'WAITING FOR TRANSACTION COMPLETION'}});
       let settings = await getSettingsServerSide();
       const client = new APIClient([settings.bikecoin.provider_url]);
 
@@ -374,16 +388,73 @@ if(Meteor.isServer) {
         message: 'Bike locked.'
       }
     },
-    'objects.updateBikeLocationUsingAddress'(bikeAddress, latitude, longitude) {
+    'objects.updateBikeLocation'(bikeAddress, latitude, longitude) {
       doServerUpdateBikeLocation(bikeAddress, latitude, longitude);
     },
     'bl10.reconnect'(id) {
       let timestamp = new Date();
-      console.log('bl10.reconnect call for lock %s / %o', id, timestamp);
+      console.log('bl10.reconnect call for lock %s / %s', id, timestamp.toLocaleString());
     },
-    'bl10.heartbeat'(id, info) {
+    'bl10.updateinfo'(id, info, apitoken=false) {
       let timestamp = new Date();
-      console.log('bl10.heartbeat call for lock %s / %o / %o', id, timestamp, info);
+      // console.log('bl10.updateinfo call for lock %s / %s / %o', id, timestamp.toLocaleString(), info);
+      console.log('bl10.updateinfo call for lock %s / %s', id, timestamp.toLocaleString());
+      
+      let object = Objects.findOne(id);
+      if(object) {
+        // update info serverside
+        let changes = {
+          'lock.state_timestamp' : new Date(),
+          'lock.locked': info.locked,
+          'lock.charging': info.charging,
+          'lock.battery': info.voltage,
+          // 'lock.gsmstrength': info.gsmstrength,
+          // 'lock.gpspositioning': info.gpspositioning
+        }
+
+        doApplyChanges(id, changes, apitoken);
+      } else {
+        console.log("unable to find lock with id %s", id)
+      }
     },
+    'bl10.setlocked'(id, locked, apitoken=false) {
+      let timestamp = new Date();
+      // console.log('bl10.updateinfo call for lock %s / %s / %o', id, timestamp.toLocaleString(), info);
+      console.log('bl10.setlocked %s call for lock %s / %s', locked, id, timestamp.toLocaleString());
+      
+      let object = Objects.findOne(id);
+      if(object) {
+        // update info serverside
+        let changes = {
+          'lock.state_timestamp' : new Date(),
+          'lock.locked': locked,
+        }
+
+        doApplyChanges(id, changes, apitoken);
+      } else {
+        console.log("unable to find lock with id %s", id)
+      }
+    },
+    'bl10.updatebikelocation'(id, latitude, longitude, apitoken=false) {
+      let timestamp = new Date();
+      console.log('bl10.updateBikeLocation call for lock %s / %s / [%s,%s]',
+        id, timestamp.toLocaleString(), latitude, longitude);
+        
+        let changes = {
+          'lock.state_timestamp' : new Date(),
+          'lock.lat_lng': [latitude, longitude],
+          // 'lock.gsmstrength': info.gsmstrength,
+          // 'lock.gpspositioning': info.gpspositioning
+        }
+
+        // find lock blockchain
+        let object = Objects.findOne(id);
+        if(object) {
+          doApplyChanges(id, changes, apitoken || false);
+        } else {
+          console.log("unable to find lock with id %s", id)
+        }
+    }
+    
   });
 }

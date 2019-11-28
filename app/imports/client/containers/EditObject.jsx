@@ -202,18 +202,22 @@ class EditObject extends Component {
             label: 'Lock ID'
         },
         {
-            fieldname: 'lock._state', // generated field
-            fieldvalue: (object.lock.locked ? 'Locked':'Unlocked') +  ' @ '
-                        + (object.lock.state_timestamp ? object.lock.state_timestamp.toLocaleString() : 'unknown'),
+            fieldname: 'lock.state_timestamp',
+            fieldvalue: (object.lock.state_timestamp ? object.lock.state_timestamp.toLocaleString() : 'not set'),
+            controltype: 'text-readonly',
+            label: 'Last state update'
+        },
+        {
+            fieldname: 'lock._locked', // generated field
+            fieldvalue: (object.lock.locked ? 'Locked':'Unlocked'),
             controltype: 'text-readonly',
             label: 'Locked'
         },
         {
             fieldname: 'lock._location', // generated field
-            fieldvalue: '[' + (object.lock.lat_lng ? object.lock.lat_lng[0] : 'x') + ',' + (object.lock.lat_lng ? object.lock.lat_lng[1] : 'x') + '] @ '
-                        + (object.lock.lat_lng_timestamp ? object.lock.lat_lng_timestamp.toLocaleString() : 'unknown'),
+            fieldvalue: '[' + (object.lock.lat_lng ? object.lock.lat_lng[0] : 'x') + ',' + (object.lock.lat_lng ? object.lock.lat_lng[1] : 'x') + ']',
             controltype: 'text-readonly',
-            label: 'Battery Voltage'
+            label: 'Location'
         },
         {
             fieldname: 'lock.battery',
@@ -271,8 +275,10 @@ class EditObject extends Component {
   getBlockchainFields() {
     const {object} = this.props;
     
+    console.log('get blockchain fields %o', object)
+    
     let fields = [];
-    if(! object.blockchain || object.blockchain.id=='') {
+    if(object.blockchain.id=='') {
       fields = [
         {
             fieldname: 'blockchain.id',
@@ -282,62 +288,29 @@ class EditObject extends Component {
     		},
     		{
             fieldname: 'blockchain.title',
-            fieldvalue: (object.blockchain ? object.blockchain.title : object.title),
+            fieldvalue: object.blockchain.title,
             controltype: 'text',
             label: 'Title'
     		},
     		{
             fieldname: 'blockchain.description',
-            fieldvalue: (object.blockchain ? object.blockchain.description : object.description),
+            fieldvalue: object.blockchain.description,
             controltype: 'text',
             label: 'Description'
     		},
     		{
             fieldname: 'blockchain.pricePerHourInLSK',
-            fieldvalue: (object.blockchain ? object.blockchain.pricePerHourInLSK : object.lisk.pricePerHourInLSK),
+            fieldvalue: object.blockchain.pricePerHourInLSK,
             controltype: 'number',
             label: 'Price/Hour (LSK)'
     		},
         {
             fieldname: 'blockchain.depositInLSK',
-            fieldvalue: (object.blockchain ? object.blockchain.depositInLSK : object.lisk.depositInLSK),
+            fieldvalue: object.blockchain.depositInLSK,
             controltype: 'number',
             label: 'Deposit (LSK)'
     		}
-      //   {
-      //       fieldname: 'transferseedfunds',
-      //       fieldvalue: 'transferseedfunds',
-      //       controltype: 'clientside-action-nochanges',
-      //       label: 'TRANSFER SEED FUNDS'
-    		// },
-      //   {
-      //       fieldname: 'registeronblockchain',
-      //       fieldvalue: 'registeronblockchain',
-      //       controltype: 'clientside-action-nochanges',
-      //       label: 'Register on the blockchain'
-    		// }
       ]
-    } else if(object.blockchain.id=='WAITING FOR TRANSACTION COMPLETION') {
-        fields = [
-          {
-              fieldname: 'blockchain.id',
-              fieldvalue: object.blockchain.id,
-              controltype: 'text-readonly',
-              label: 'Asset ID'
-      		},
-      		{
-              fieldname: 'blockchain.title',
-              fieldvalue: object.blockchain.title,
-              controltype: 'text-readonly',
-              label: 'Title'
-      		},
-      		{
-              fieldname: 'blockchain.description',
-              fieldvalue: object.blockchain.description,
-              controltype: 'text-readonly',
-              label: 'Description'
-      		}
-        ]
     } else {
       fields = [ // Read only once registered
         {
@@ -366,7 +339,7 @@ class EditObject extends Component {
     		},
         {
             fieldname: 'blockchain.lat_lng',
-            fieldvalue: '[' + object.lock.lat_lng[0] + ', ' + object.lock.lat_lng[0] + ']',
+            fieldvalue: '[' + object.blockchain.lat_lng[0] + ', ' + object.blockchain.lat_lng[1] + ']',
             controltype: 'text-readonly',
             label: 'Location on blockchain'
     		},
@@ -463,7 +436,7 @@ export default withTracker((props) => {
   Meteor.subscribe('settings');
   
   let isnew = false;
-  let object = Objects.findOne({_id: props.objectId})
+  let object = Objects.findOne({'wallet.address': props.objectId})
   if(undefined==object) {
     let settings = getSettingsClientSide();
     if(settings) {

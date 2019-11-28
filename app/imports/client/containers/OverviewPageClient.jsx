@@ -64,6 +64,8 @@ class OverviewPageClient extends Component {
       this.setState((prevstate) => {
         return { ['asset-' + object.id]:false}});
     }
+    
+    // console.log(this.state);
   }
   
   componentWillUnmount() {
@@ -86,7 +88,7 @@ class OverviewPageClient extends Component {
     this.setState((prevstate) => {
       return {
         objects: newObjects,
-        timer: setTimeout(this.updateObjects.bind(this), 25000)
+        timer: setTimeout(this.updateObjects.bind(this), 10000)
       }
     });
   }

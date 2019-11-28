@@ -66,6 +66,8 @@ const startMeteorServer = async (endpoint="ws://localhost:3000/websocket") => {
   await startMeteorServer()
   
   bl10.startBikeApiServer(meteorserver, apiclient);
+  
+  setTimeout(bl10.checkRentalState, 5000);
 })();
 
 

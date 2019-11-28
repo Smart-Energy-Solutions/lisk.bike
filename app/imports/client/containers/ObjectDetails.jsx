@@ -186,6 +186,13 @@ class ObjectDetails extends Component {
                 <RentBikeButton bikeId={this.props.objectId} depositInLSK={deposit} classes={classes} isDisabled={unlocked} />
               </>
           }
+          
+          {
+            this.props.object!=undefined ?
+              <Typography variant="h6">{this.props.object.lock.locked  == true ? "locked" : "unlocked"}</Typography>
+            :
+              null
+          }
         </div>
       </div>
     );
@@ -213,10 +220,14 @@ export default withTracker((props) => {
       console.log("no settings available");
       return {};
     }
+    
+    let object = Objects.findOne({'wallet.address': props.objectId});
+    console.log("found object %o", object)
 
     // Return variables for use in this component
     return {
       objectId: props.objectId,
+      object,
       settings: settings
     };
 })(withStyles(styles) (ObjectDetails));

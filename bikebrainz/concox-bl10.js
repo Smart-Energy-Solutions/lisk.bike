@@ -7,6 +7,9 @@ const fs = require('fs');
 const transactions = require('@liskhq/lisk-transactions');
 
 const UpdateBikeLocationTransaction = require('../app/imports/api/lisk-blockchain/transactions/update-bike-location');
+const ReturnBikeTransaction = require('../app/imports/api/lisk-blockchain/transactions/return-bike');
+
+let sockets = [];
 
 // helper functions
 const prefix = (text, prefix) => {
@@ -15,6 +18,8 @@ const prefix = (text, prefix) => {
 
 const { EPOCH_TIME } = require('@liskhq/lisk-constants');
 
+const cApiToken = 'keepcycling!!';
+
 // Function that generates timestamp
 const getTimestamp = () => {
   const millisSinceEpoc = Date.now() - Date.parse(EPOCH_TIME);
@@ -22,9 +27,8 @@ const getTimestamp = () => {
   return  parseInt(inSeconds);
 };
 
-
 // blockchain functions
-const updateBikeLocation = async (client, bikeaccount, latitude, longitude) => {
+const updateBikeLocationOnBlockchain = async (client, bikeaccount, latitude, longitude) => {
   console.log("doing update bike location transaction on the blockchain")
   // find the bike info on the blockchain
   let account = undefined;
@@ -58,6 +62,42 @@ const updateBikeLocation = async (client, bikeaccount, latitude, longitude) => {
   return await client.transactions.broadcast(tx.toJSON());
 }
 
+// blockchain functions
+const returnBikeOnBlockchain = async (client, bikeaccount, latitude, longitude) => {
+  console.log("doing update bike location transaction on the blockchain")
+  // find the bike info on the blockchain
+  let account = undefined;
+  let accountlist = await client.accounts.get({address:bikeaccount.address});
+  if(accountlist.data.length==1) {
+    account = accountlist.data[0];
+  } else {
+    console.log("bike account not found. Please try again");
+    return false;
+  }
+  
+  let asset = {
+      id: bikeaccount.address,
+  }
+  
+  let prevlatitude = account.asset.location ? account.asset.location.latitude : 0;
+  let prevlongitude = account.asset.location ? account.asset.location.longitude : 0;
+    
+  asset.location = {longitude,latitude};
+  asset.prevlocation = {prevlongitude, prevlatitude};
+
+  console.log("setting asset location to %o", asset.location);
+
+  const tx = new ReturnBikeTransaction({
+      asset,
+      senderPublicKey: bikeaccount.publicKey,
+      recipientId: account.asset.rentedBy,
+      timestamp: getTimestamp(),
+  });
+
+  tx.sign(bikeaccount.passphrase);
+  
+  return await client.transactions.broadcast(tx.toJSON());
+}
 
 // experimental code for Concox BL10 lock socket server
 // parse code borrowed from https://gitlab.com/elyez/concox
@@ -87,15 +127,6 @@ bl10.startBikeApiServer = (meteorserver, apiclient, port = 3005, serverip = '0.0
       });
     });
   	
-    // if(false==resetsent) {
-    //   console.log("send command");
-    //   // socket.write(bl10.createSendCommand('GPRSSET#'))
-    //   // bikeapiserver:1,app.lisk.bike,9020,0
-    //   // socket.write(bl10.createSendCommand('bikeapiserver,1,app.lisk.bike/api/liskbike,80,0#'))
-  	// 	// socket.write(bl10.createSendCommand('UNLOCK#'))
-    //   resetsent=true;
-    // }
-
   	// socket.write('Echo bikeapiserver\r\n');
   	// socket.pipe(socket);
 
@@ -212,6 +243,8 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket) => {
     // TODO: decode timezone info
     let imei = infocontent.substr(0,8*2);
     socket.id = imei;
+
+    sockets[imei] = socket;
   } else {
     if(!"id" in socket) {
       console.warn("received command on unnamed socket. Ignoring command");
@@ -287,55 +320,66 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket) => {
         gsmstrength: gsmstrength
       }
       
-      if(lockAsset!=undefined) {
-        if(hbtinfo.locked==true) {
-          if(lockAsset.rentedBy!='') {
-            // send end of rent transaction
-          } else {
-            //
-          }
-        } else {
-          if(lockAsset.rentedBy!='') {
-            // send end of rent transaction
-          }
-        }
-      } else {
-        console.log("unable to compare lock state against the blockchain")
-      }
-      
-      // if(theLock!=undefined) {
-      //   console.log("%s sent hbtinfo %s", theLock.lock.lockid, JSON.stringify(hbtinfo,0,2));
-      //   console.log("doing update for object theLock._id", theLock.lock.lockid, JSON.stringify(hbtinfo,0,2));
-      //
-      //   Objects.update({'lock.lockid' : theLock.lock.lockid, 'lock.locktype': 'concox-bl10'}, {$set: {
-      //     'state.state': hbtinfo.locked==false? 'available': 'inuse',
-      //     'state.timestamp': new Date(),
-      //     'lock.timestamp': new Date(),
-      //     'lock.locked': hbtinfo.locked,
-      //     'lock.battery': hbtinfo.voltage,
-      //     'lock.charging': hbtinfo.charging==true}
-      //   });
-      //
-      //   // write lock state to blockchain if changed
+      // if(lockAsset!=undefined) {
+      //   if(hbtinfo.locked==true) {
+      //     if(lockAsset.rentedBy!='') {
+      //       // send end of rent transaction
+      //     } else {
+      //       //
+      //     }
+      //   } else {
+      //     if(lockAsset.rentedBy!='') {
+      //       // send end of rent transaction
+      //     }
+      //   }
+      // } else {
+      //   console.log("unable to compare lock state against the blockchain")
       // }
-  
-      // console.log("heartbeat from %s (locked: %s / charging: %s / gpspositioning: %s / voltage: %s / gsm signal: %s)", socket.id, hbtinfo.locked, hbtinfo.charging, hbtinfo.gpspositioning, hbtinfo.voltage, hbtinfo.gsmstrength);
-      
+          
       if(theLock) {
-        await themeteorserver.call('bl10.heartbeat', socket.id, hbtinfo);
+        console.log("$$$$ updating lock %s with %o", theLock.id, hbtinfo);
+        await themeteorserver.call('bl10.updateinfo', theLock.id, hbtinfo, cApiToken);
+      } else {
+        console.log("no lock info for %s", socket.id);
       }
       
       break;
     case '32':  // normal location
     case '33':  // alarm location
-      let infolength = util.hex2int(infocontent.substr(6*2,1*2));
-      let gpsinfo = {
-        gpstime   : util.toTime(infocontent.substr(0*2,2), infocontent.substr(1*2,2), infocontent.substr(2*2,2), infocontent.substr(3*2,2), infocontent.substr(4*2,2), infocontent.substr(5*2,2), 'hex'),
-      }
+      let timestamp = util.toTime(infocontent.substr(0*2,2), infocontent.substr(1*2,2), infocontent.substr(2*2,2), infocontent.substr(3*2,2), infocontent.substr(4*2,2), infocontent.substr(5*2,2), 'hex');
+      
+      // calculate offsets
+      let gpsoffset = 6*2;
+      let gpsinfolength = util.hex2int(infocontent.substr(gpsoffset,1 * 2));
+      let gpsinfo = util.hex2int(infocontent.substr(gpsoffset+1*2,gpsinfolength));
+
+      let mbsoffset = gpsoffset + 1*2 + gpsinfolength;
+      let mbsinfolength = util.hex2int(infocontent.substr(mbsoffset,1*2));
+      let mbsinfo = util.hex2int(infocontent.substr(mbsoffset+1*2,mbsinfolength));
+
+      let sbsoffset = mbsoffset + 1*2 + mbsinfolength;
+      let sbsinfolength = util.hex2int(infocontent.substr(sbsoffset,1*2));
+      let sbsinfo = util.hex2int(infocontent.substr(sbsoffset+1*2,sbsinfolength));
+
+      let wifioffset = sbsoffset + 1*2 + sbsinfolength;
+      let wifiinfolength = util.hex2int(infocontent.substr(wifioffset,1*2));
+      let wifiinfo = util.hex2int(infocontent.substr(wifioffset+1,wifiinfolength));
+
+      let statusoffset = wifioffset + 1*2 + wifiinfolength;
+      
+      let status = infocontent.substr(statusoffset,1*2);
+
+      // TODO: decode mbs / sbs / wifi info
+      
+      // console.log('infocontent : %s', infocontent);
+      // console.log('got lengths : %s %s %s', gpsinfolength, mbsinfolength, sbsinfolength, wifiinfolength);
+      // console.log('got offsets : %s %s %s', gpsoffset, mbsoffset, sbsoffset, wifioffset);
+      // console.log('got data : %s %s %s', gpsinfo, mbsinfo, wifiinfo);
+      // console.log('got status : %s', status);
       
       // console.log('baseinfo la/t %s %s',infocontent.substr(8*2,4*2), util.hex2int(infocontent.substr(8*2,4*2)));
       
-      if(infolength==12) {
+      if(gpsinfolength==12) {
         gpsinfo = {
           gpstime   : util.toTime(infocontent.substr(0*2,2), infocontent.substr(1*2,2), infocontent.substr(2*2,2), infocontent.substr(3*2,2), infocontent.substr(4*2,2), infocontent.substr(5*2,2), 'hex'),
           infolength: util.hex2int(infocontent.substr(6*2,1*2)),
@@ -347,29 +391,79 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket) => {
           coursestatus : infocontent.substr(17*2,2*2),
           received  : new Date().toISOString(),
         }
-        // TODO: decodeMBSL/MCC/MNC/CI/RSSI and rest
+      } else {
+        gpsinfo = false;
+      }
         
-        // let status='unknown';
-        // let data =
-        // if(cmd=='32') {
-        //   switch()
-        // } else if(cmd=='33') {
-        //
-        // }
-        if(gpsinfo.infolength>0) {
-        // if(theLock!=undefined&&gpsinfo.infolength>0) {
+      // TODO: decodeMBSL/MCC/MNC/CI/RSSI and rest
+      
+      if(cmd=='32') {
+        switch(status.toUpperCase()) {
+          case '00': console.log('received timing GPS report'); break;
+          case '01': console.log('received fixed distance GPS report'); break;
+          case '02': console.log('received re-upload gps data report'); break;
+          default:
+            console.log('uknown 0x32 status: %s', status.toUpperCase());
+        }
+      } else if(cmd=='33') {
+        switch(status.toUpperCase()) {
+          case 'A0': // received lock report
+            // update database state
+            if(theLock) {
+              // unrent bike here
+              returnBikeOnBlockchain(theapiclient, theLock.wallet, theLock.lock.lat_lng[0], theLock.lock.lat_lng[1]);
+              
+              console.log("$$$$ lock %s was closed %s", theLock.id, status.toUpperCase());
+              await themeteorserver.call('bl10.setlocked', theLock.id, true, cApiToken);
+            } else {
+              console.log("no lock info for %s", socket.id);
+            }
+
+            break;
+          case 'A1': // 'received unlock report'
+          case 'A5': // 'received abnormal unlock alarm'
+            // send alarm if bike has not been rented here
+            
+            // update database state
+            if(theLock) {
+              console.log("$$$$ lock %s was opened %s", theLock.id, status.toUpperCase());
+              await themeteorserver.call('bl10.setlocked', theLock.id, false, cApiToken);
+            } else {
+              console.log("no lock info for %s", socket.id);
+            }
+
+            break;
+          case 'A2':
+            console.log('received low internal battery alarm');
+            break;
+          case 'A3':
+            console.log('received low battery and shutdown alarm');
+            break;
+          case 'A4':
+            console.log('received abnormal alarm');
+            break;
+          default:
+            console.log('uknown 0x33 status: %s', status.toUpperCase());
+        }
+      }
+
+      if(gpsinfo!=false) {
+        if(theLock!=undefined) {
         //   Objects.update(theLock._id, {$set: {
         //     'lock.lat_lng': [gpsinfo.latitude, gpsinfo.longitude],
         //     'lock.lat_lng_timestamp': new Date() }
         //   });
           console.log("update lock gps location to [%s, %s]",gpsinfo.latitude, gpsinfo.longitude)
-          updateBikeLocation(theapiclient, theLock.wallet, gpsinfo.latitude, gpsinfo.longitude);
+          updateBikeLocationOnBlockchain(theapiclient, theLock.wallet, gpsinfo.latitude, gpsinfo.longitude);
           
-        }
+          await themeteorserver.call('bl10.updatebikelocation', theLock.id, gpsinfo.latitude, gpsinfo.longitude, cApiToken);
 
-        console.log("location from %s (%s)", socket.id, JSON.stringify(gpsinfo));
+          console.log("location from %s (%s)", socket.id, JSON.stringify(gpsinfo));
+        } else {
+          console.log("no lock info for %s", socket.id);
+        }
       } else {
-        // console.log("empty location record from %s", socket.id);
+        console.log("no gps info in received command");
       }
     
       break;
@@ -470,6 +564,48 @@ bl10.processSinglePacket = async (socket, buf) => {
       if (err) throw err;
     });
   }
+}
+
+bl10.checkRentalStateForLock = async (theLock) => {
+  // fetch blockchain state for lock
+  let accountinfo = await bl10.getBlockchainAsset(theLock.wallet.address);
+  if(undefined==accountinfo) {
+    console.warn('cant get blockchain accountinfo data for %s / %s', theLock.blockchain.title, theLock.wallet.address);
+    return;
+  }
+  
+  // compare blockchain state to lock state
+  // console.log("check rental state for lock %s", theLock.blockchain.title)
+  // console.log("  - accountinfo.asset.rentedBy: %s", accountinfo.asset.rentedBy)
+  // console.log("  - theLock.lock.locked: %s", theLock.lock.locked)
+  // console.log("accountinfo %o:", accountinfo)
+  // console.log("lock %o:", theLock.lock)
+  
+  
+  if(theLock.lock.locked==true && accountinfo.asset.rentedBy!='') {
+    // rented and not open?
+    console.log("check rental state for lock %s - send unlock command", theLock.blockchain.title);
+
+    let asocket = sockets[theLock.lock.lockid];
+    if(undefined==asocket) {
+      console.warn('cant get communication socket for %s', theLock.blockchain.title);
+      return;
+    }
+    
+		asocket.write(bl10.createSendCommand('UNLOCK#'))
+  } else {
+    console.log("check rental state for lock %s - no action required", theLock.blockchain.title);
+  }
+}
+
+bl10.checkRentalState = async () => {
+  // get all local locks
+  console.log("start rental check cycle for all my locks")
+  const filterfunc = (object=>{return (object.lock.locktype=='concox-bl10' && object.blockchain.id!='') });
+  let theLocks = await themeteorserver.collection("objects").filter(filterfunc).fetch();
+  theLocks.forEach(async lock=>{ await bl10.checkRentalStateForLock(lock)});
+  
+  setTimeout(bl10.checkRentalState, 5000);
 }
 
 module.exports = bl10;
