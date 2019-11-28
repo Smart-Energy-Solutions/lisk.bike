@@ -119,7 +119,7 @@ bl10.startBikeApiServer = (meteorserver, apiclient, port = 3005, serverip = '0.0
         if (err) throw err;
       });
       socket.tsreceived = new Date();
-  		console.log('+++incoming data from %s / %s - %s', socket.remoteAddress, socket.id, socket.tsreceived && socket.tsreceived.toLocaleString());
+  		// console.log('+++incoming data from %s / %s - %s', socket.remoteAddress, socket.id, socket.tsreceived && socket.tsreceived.toLocaleString());
       const buf = data.toString('hex');
       const cmdSplit = buf.split(/(?=7878|7979)/gi)
       cmdSplit.map( buf => {
@@ -146,20 +146,20 @@ bl10.startBikeApiServer = (meteorserver, apiclient, port = 3005, serverip = '0.0
 bl10.createSendCommand = (command) => {
   let messageCount = 1;
 
-  const startBit = new Buffer([0x78, 0x78]);
-  const protocolNumber = new Buffer([0x80]);
+  const startBit = Buffer.from([0x78, 0x78]);
+  const protocolNumber = Buffer.from([0x80]);
   // Information on content
   const commandContent = Buffer.from(command, 'ascii');
-  const serverFlagBit = new Buffer([0x00, 0x00, 0x00, 0x00]);
-  const lengthOfCommand = new Buffer([serverFlagBit.length + commandContent.length]);// serverFlagBit + command content length
-  const language = new Buffer([0x02]);// English
+  const serverFlagBit = Buffer.from([0x00, 0x00, 0x00, 0x00]);
+  const lengthOfCommand = Buffer.from([serverFlagBit.length + commandContent.length]);// serverFlagBit + command content length
+  const language = Buffer.from([0x02]);// English
   //
-  const informationSerialNumber = new Buffer([0x00, messageCount]);
+  const informationSerialNumber = Buffer.from([0x00, messageCount]);
 
-  const lengthOfDataBit = new Buffer([
+  const lengthOfDataBit = Buffer.from([
     protocolNumber.length
     + Buffer.concat([
-      new Buffer([lengthOfCommand.length]),
+      Buffer.from([lengthOfCommand.length]),
       serverFlagBit,
       commandContent,
       // language
@@ -169,7 +169,7 @@ bl10.createSendCommand = (command) => {
   ])
 
   const hexstring = crc16(
-    new Buffer.concat([
+    Buffer.from.concat([
       lengthOfDataBit,
       protocolNumber,
       lengthOfCommand,
@@ -180,10 +180,10 @@ bl10.createSendCommand = (command) => {
     ])
   ).toString(16);
 
-  const errorCheck = new Buffer(hexstring, 'hex');
-  const stopBit = new Buffer([0x0D, 0x0A]);
+  const errorCheck = Buffer.from(hexstring, 'hex');
+  const stopBit = Buffer.from([0x0D, 0x0A]);
 
-  return new Buffer.concat([
+  return Buffer.from.concat([
     startBit,
     lengthOfDataBit,
     protocolNumber,
@@ -252,7 +252,7 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket) => {
     }
   }
   
-  let lastts = dateFormat(new Date(), 'yymmddHHMMss', true);
+  let lastts = (new Date()).toLocaleString();
   let lastserial =  serialNo;
   
   let lockAsset = undefined
@@ -267,7 +267,7 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket) => {
       let modelcode =  infocontent.substr(8*2,2*2);
       let timezone =  infocontent.substr(10*2,2*2); // TODO: decode timezone info
       
-      // console.log("login from %s (model: %s / tz: %s)", cmdinfo.imei, cmdinfo.modelcode, cmdinfo.timezone);
+      console.log("%s - login from %s (model: %s / tz: %s)", lastts, socket.id, modelcode, timezone);
       
       if (serialNo) {
         const utcdatetime = dateFormat(new Date(), 'yymmddHHMMss', true);
@@ -275,7 +275,7 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket) => {
         content = util.decimalToHexString(content.length) + content;
         const crcCheck = crc16(content, 'hex').toString(16);
         let response = `7878${content}${'0000'.substr(0, 4 - crcCheck.length) + crcCheck}0D0A`
-        let str = new Buffer(response, 'hex');
+        let str = Buffer.from(response, 'hex');
         // console.log('replying with ' + response);
         socket.write(str);
       }
@@ -284,19 +284,23 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket) => {
         await themeteorserver.call('bl10.reconnect', socket.id);
       }
       
-      console.log("sending where command")
-      socket.write(bl10.createSendCommand('WHERE#'));
+      // console.log("sending where command")
+      // socket.write(bl10.createSendCommand('WHERE#'));
+      // socket.write(bl10.createSendCommand('UNLOCK#'));
+      // socket.write(bl10.createSendCommand('STATUS#'));
+      // socket.write(bl10.createSendCommand('LJDW#'));
       
       break;
     case '21': // online command response
       let info = {
         length: infocontent.substr(0*2,1),
-        content: new Buffer(infocontent.substr(5*2), 'hex'),
+        content: Buffer.from(infocontent.substr(5*2), 'hex'),
       }
-      console.log("command response from %s (length: %s) [%s]", socket.id, info.length, info.content);
-      // console.log("source string: %s", new Buffer(infocontent, 'hex'));
+      console.log("%s - command response from %s (length: %s) [%s]", lastts, socket.id, info.length, info.content);
+      // console.log("source string: %s", Buffer.from(infocontent, 'hex'));
       break;
     case '23': // heartbeat package
+      console.log("%s - heartbeat from %s ", lastts, socket.id);
       let terminalinfo = util.hex2bin(infocontent.substr(0,1*2));
       let language = infocontent.substr(4*2,2*2);
       // TODO: decode language bits
@@ -337,7 +341,7 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket) => {
       // }
           
       if(theLock) {
-        console.log("$$$$ updating lock %s with %o", theLock.id, hbtinfo);
+        // console.log("$$$$ updating lock %s with %o", theLock.id, hbtinfo);
         await themeteorserver.call('bl10.updateinfo', theLock.id, hbtinfo, cApiToken);
       } else {
         console.log("no lock info for %s", socket.id);
@@ -346,6 +350,7 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket) => {
       break;
     case '32':  // normal location
     case '33':  // alarm location
+      console.log("%s - info from %s (type %s) ", lastts, socket.id, cmd);
       let timestamp = util.toTime(infocontent.substr(0*2,2), infocontent.substr(1*2,2), infocontent.substr(2*2,2), infocontent.substr(3*2,2), infocontent.substr(4*2,2), infocontent.substr(5*2,2), 'hex');
       
       // calculate offsets
@@ -467,10 +472,8 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket) => {
       }
     
       break;
-    default:
-      console.log("unhandled command %s from %s (%s)", cmd, socket.id, infocontent)
-      break;
     case '98':
+      console.log("%s - info from %s (type %s) ", lastts, socket.id, cmd);
       
       let moduleidx=1;
       let startidx=0;
@@ -491,7 +494,7 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket) => {
           // console.log('found entry of type %s of %s bytes', typehex, modulelength)
           let tmpstr=infocontent.substr((startidx + 3)*2, modulelength*2);
           itpinfo[moduletype]=tmpstr;
-          let buffer = new Buffer(infocontent.substr((startidx + 3)*2, modulelength*2),'hex');
+          let buffer = Buffer.from(infocontent.substr((startidx + 3)*2, modulelength*2),'hex');
           // console.log("data: %s", buffer)
         }
 
@@ -501,6 +504,9 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket) => {
     
       // console.log('information transmission %o', itpinfo);
       break;
+    default:
+      console.log("%s - unhandled command %s from %s (%s)", lastts, cmd, socket.id, infocontent)
+      break;
   }
 
   if (serialNo) {
@@ -509,7 +515,7 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket) => {
     const content = `05${cmd}${serialNo}`;
     const crcCheck = crc16(content, 'hex').toString(16);
     let response = `7878${content}${'0000'.substr(0, 4 - crcCheck.length) + crcCheck}0D0A`;
-    let str = new Buffer(response, 'hex');
+    let str = Buffer.from(response, 'hex');
     socket.write(str);
     //console.log("sending %s", response)
 
@@ -592,15 +598,15 @@ bl10.checkRentalStateForLock = async (theLock) => {
       return;
     }
     
-		asocket.write(bl10.createSendCommand('UNLOCK#'))
+		asocket.write(bl10.createSendCommand('UNLOCK#'));
   } else {
-    console.log("check rental state for lock %s - no action required", theLock.blockchain.title);
+    // console.log("check rental state for lock %s - no action required", theLock.blockchain.title);
   }
 }
 
 bl10.checkRentalState = async () => {
   // get all local locks
-  console.log("start rental check cycle for all my locks")
+  // console.log("start rental check cycle for all my locks")
   const filterfunc = (object=>{return (object.lock.locktype=='concox-bl10' && object.blockchain.id!='') });
   let theLocks = await themeteorserver.collection("objects").filter(filterfunc).fetch();
   theLocks.forEach(async lock=>{ await bl10.checkRentalStateForLock(lock)});

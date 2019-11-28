@@ -22,8 +22,8 @@ const styles = theme => ({
   },
   addbox: {
     position: 'relative',
-    width: '38vmin', // '120px',
-    height: '45vmin', // '120px',
+    width: '22.5vmin', // '120px',
+    height: '22.5vmin', // '120px',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-around',

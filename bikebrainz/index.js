@@ -48,19 +48,8 @@ const startMeteorServer = async (endpoint="ws://localhost:3000/websocket") => {
   };
 };
 
-// var resetsent = false;
-
 // this is the server that handles the incoming connections
 // from the bl10 locks
-
-// ---------------------------------------------------
-// for now the bl10 bikeapiserver is parked in the meteor app
-// so that I can use the mongodb for state storage
-//
-// later on when things run through the blockchain
-// it can be moved to a separate process. This process
-// can either run standalone or be controlled by using pm2
-// commands issued by the meteor backend.
 
 (async () => {
   await startMeteorServer()
