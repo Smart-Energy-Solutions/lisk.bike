@@ -88,30 +88,49 @@ class EditObject extends Component {
     return await doCreateAccount(true, this.props.object.wallet.passphrase)
   }
 
+  // Function that registers the bike onto a blockchain
+  registerBikeOnTheBlockchain = async (err, res) => {
+    const { object, objectId } = this.props;
+
+    // Check for errors
+    if(err) {
+      console.error("registerBikeOnTheBlock - unable to update object (%o)" , err);
+      return false;
+    }
+
+    if(! res.id) {
+      console.error('registerBikeOnTheBlock - bike could not be stored in the database');
+      return false;
+    }
+
+    // Only register on blockchain if object is not yet on the blockchain
+    if(object.blockchain.id!='') {
+      console.warn('objects can only be registered on the blockchain once');
+      return false;
+    }
+    
+    // Transfer seed funds
+    const transferSeedFundsResult = await this.transferSeedFunds()
+
+    // Register bike on the blockchain..
+    // ..as soon as seeding is processed by the blockchain.
+    setTimeout(() => {
+      this.sendSettingsToBlockchain(objectId)
+    }, 10000)
+  }
+
   updateLocalSettings(changes) {
-    const self = this;
+    const { isnew, object } = this.props;
 
-    // Function that logs an error
-    const logError = (err) => console.error(err)
-
-    // Function that registers the bike onto a blockchain
-    const registerBikeOnTheBlockchain = async (err, res) => {
-      // Only register on blockchain if object is new
-      if(!self.props.isnew == false) return false;
-      // Check for errors
-      if(err) { logError(err); return false; }
-      if(! res.id) { logError('Bike could not be stored to the database') }
-      // Transfer seed funds
-      const transferSeedFundsResult = await this.transferSeedFunds()
-      // Register bike on the blockchain..
-      // ..as soon as seeding is processed by the blockchain.
-      setTimeout(function() {
-        self.sendSettingsToBlockchain(self.props.objectId)
-      }, 10000)
+    if(object.blockchain.id=='') {
+      // apply changes and register on the blockchain
+      Meteor.call('objects.applychanges', this.props.object._id, changes, this.registerBikeOnTheBlockchain);
+    } else {
+      // just apply changes
+      Meteor.call('objects.applychanges', this.props.object._id, changes);
     }
 
     // Update the object settings that are backend specific in the local mongodb
-    Meteor.call('objects.applychanges', this.props.object._id, changes, registerBikeOnTheBlockchain);
     return true;
   }
 
@@ -457,7 +476,7 @@ export default withTracker((props) => {
 
   // Return variables for use in this component
   return {
-    object:object,
+    object,
     isnew,
     ...props,
   };

@@ -11,9 +11,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@liskhq/lisk-client": "^2.3.1",
     "crc16-itu": "^1.0.6",
     "dateformat": "^3.0.3",
+    "dotenv": "^8.2.0",
     "isomorphic-ws": "^4.0.1",
+    "lisk-sdk": "^2.3.6",
     "simpleddp": "^2.2.4",
     "ws": "^7.2.0"
   }

@@ -6,3 +6,4 @@ node_modules
 npm-debug.log
 documentation/concox-bl10-smart-lock/confidential
 blockchain/logs/
+bikebrainz/received-commands.txt

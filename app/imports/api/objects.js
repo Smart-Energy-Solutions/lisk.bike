@@ -233,6 +233,7 @@ if(Meteor.isServer) {
       
       let object = Objects.findOne(_id);
       if(object) {
+        let title = (changes['blockchain.title'] || object.blockchain && object.blockchain.title || "unnamed object");
         var context =  ObjectsSchema.newContext();
         console.log('changes')
         console.log(changes)
@@ -242,17 +243,17 @@ if(Meteor.isServer) {
             changes,
             { title: changes['blockchain.title'] }
           )});
-          console.log('Settings changed for ' + (changes['blockchain.title'] || "unnamed object"));
+          console.log('Settings changed for ' + title);
 
           return {
             result: object,
-            message: 'Object ' + object.title + ' updated',
+            message: 'Object ' + title + ' updated',
             id: object._id
           }
         } else {
           return {
             result: false,
-            message: 'Object ' + object.title + ' contains invalid data',
+            message: 'Object ' + title + ' contains invalid data',
             id: object._id
           }
         };
@@ -280,7 +281,7 @@ if(Meteor.isServer) {
 
       Objects.remove(objectId);
 
-      var description = 'Object ' + object.title + ' was removed';
+      var description = 'Object ' + object.blockchain.title + ' was removed';
       console.log(description);
     },
     async 'objects.registeronblockchain'(objectId){
@@ -375,6 +376,14 @@ if(Meteor.isServer) {
     },
     'objects.updateBikeLocationUsingAddress'(bikeAddress, latitude, longitude) {
       doServerUpdateBikeLocation(bikeAddress, latitude, longitude);
+    },
+    'bl10.reconnect'(id) {
+      let timestamp = new Date();
+      console.log('bl10.reconnect call for lock %s / %o', id, timestamp);
+    },
+    'bl10.heartbeat'(id, info) {
+      let timestamp = new Date();
+      console.log('bl10.heartbeat call for lock %s / %o / %o', id, timestamp, info);
     },
   });
 }

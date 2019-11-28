@@ -1,60 +1,60 @@
-const bl10 = require('./concox-bl10');
-
-const net = require('net');
+// imports for the meteor / mongodb connection server
 const simpleDDP = require("simpleddp"); // nodejs
 const ws = require("isomorphic-ws");
+const { APIClient } = require('@liskhq/lisk-client');
 
-let opts = {
-    endpoint: "ws://localhost:3000/websocket",
-    SocketConstructor: ws,
-    reconnectInterval: 5000
-};
-const meteorserver = new simpleDDP(opts);
-(async ()=>{
+// imports for the bl10 server
+const bl10 = require('./concox-bl10');
+const net = require('net');
+
+// globals
+let meteorserver = undefined; // meteor server global instance
+let bikeapiserver = undefined; // bike api server global instance
+let apiclient = undefined;
+
+const startMeteorServer = async (endpoint="ws://localhost:3000/websocket") => {
+  // create a connection to the meteor mongo database
+  // we need this to get the wallet info for the
+  // incoming lock commands so we can do transactions
+  let opts = {
+      endpoint: endpoint,
+      SocketConstructor: ws,
+      reconnectInterval: 5000
+  };
+  meteorserver = new simpleDDP(opts);
+
   console.log("connectiong to meteor server!");
   await meteorserver.connect();
-  console.log("meteor server connected!");
-  let objectsSub = meteorserver.subscribe("Objects");
-  await objectsSub.ready();
-  console.log("object subscription ready!");
-  
-  // let findres = await meteorserver.collection("Objects");
-  // console.log("got objects %o", findres);
-  // connection is ready here
-})();
-
-var resetsent = false;
-
-var server = net.createServer(function(socket) {
-  console.log('incoming connection from %s',  socket.remoteAddress);
-  socket.on('data', function(data) {
-		console.log('incoming data from %s', socket.remoteAddress);
-    const buf = data.toString('hex');
-    const cmdSplit = buf.split(/(?=7878|7979)/gi)
-    cmdSplit.map( buf => {
-      bl10.processSinglePacket(socket, buf, meteorserver);
-    });
-  });
-	
-  if(false==resetsent) {
-    console.log("send command");
-    // socket.write(bl10.createSendCommand('GPRSSET#'))
-    // Server:1,app.lisk.bike,9020,0
-    // socket.write(bl10.createSendCommand('SERVER,1,app.lisk.bike/api/liskbike,80,0#'))
-		// socket.write(bl10.createSendCommand('UNLOCK#'))
-    resetsent=true;
-  }
-
-	// socket.write('Echo server\r\n');
-	// socket.pipe(socket);
-
-  socket.on('error', function(data) {
-    console.log("%o",data);
+  meteorserver.on('error', function(data) {
+    console.log("meteor server error - %o",data);
   })
-});
+  
+  console.log("meteor server connected!");
+  let objectsSub = await meteorserver.subscribe("objects").ready();
+  console.log("object subscription ready!");
+
+  let settingsSub = await meteorserver.subscribe("settings").ready();
+  console.log("setting subscription ready!");
+  
+  const filterfunc = (settings=>{return true })
+  let settings = await meteorserver.collection("settings").filter(filterfunc).fetch();
+  if(settings.length>0) {
+    blockchainproviderurl = settings[0].bikecoin.provider_url;
+    apiclient = new APIClient([blockchainproviderurl]);
+    
+    console.log("initialized blockchain api client @ %s", blockchainproviderurl);
+  } else {
+    console.warn("unable to access system settings. No blockchain api client available");
+  };
+};
+
+// var resetsent = false;
+
+// this is the server that handles the incoming connections
+// from the bl10 locks
 
 // ---------------------------------------------------
-// for now the bl10 server is parked in the meteor app
+// for now the bl10 bikeapiserver is parked in the meteor app
 // so that I can use the mongodb for state storage
 //
 // later on when things run through the blockchain
@@ -62,8 +62,11 @@ var server = net.createServer(function(socket) {
 // can either run standalone or be controlled by using pm2
 // commands issued by the meteor backend.
 
-let port = 3005;                // listening port
-let serverip = '0.0.0.0'; // external IP address for this server
+(async () => {
+  await startMeteorServer()
+  
+  bl10.startBikeApiServer(meteorserver, apiclient);
+})();
 
-console.log('starting concox BL10 server on %s:%s', serverip, port);
-server.listen(port, serverip);
+
+

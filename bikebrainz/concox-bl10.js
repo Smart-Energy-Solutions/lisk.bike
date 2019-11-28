@@ -1,52 +1,112 @@
-// import { Objects } from '/imports/api/objects.js'
-// import { getSettingsServerSide, Settings } from '/imports/api/settings.js';
-
-// demo of concox bl-10 usage (localhost)
-//
-// 1. Create a new bike with name "BL10 Demo bike"
-// 2. Go to bike settings (click info from my locations -> location -> API Demo Bike)
-// 3. Set lock type to "open-bikelocker" (Instellingen -> Slot section -> open bikelocker -> save settings)
-// 4. Create an API key for the lock (API keys -> set beschrijving to "api demo" -> click "+")
-// 5. Copy API key to a text document (click on clipboard icon)
-//
-// now test the API:
-//
-// using a webbrowser:
-//
-// set in use:
-//   http://localhost:3000/api/locker/v1?api_key=<your key here>&cardhash=00000000&pincode=12345&timestamp=1&action=inuse
-//
-// set available:
-//   http://localhost:3000/api/locker/v1?api_key=<your key here>&cardhash=00000000&pincode=12345&timestamp=1&action=available
-//
-// using curl:
-//
-// set in use:
-// curl -X POST \
-//   http://localhost:3000/api/locker/v1/ \
-//   -H 'cache-control: no-cache' \
-//   -H 'content-type: application/x-www-form-urlencoded' \
-//   -d 'api_key=<your key here>&cardhash=00000000&pincode=12345&timestamp=1&action=inuse'
-//
-// set available:
-// curl -X POST \
-//   http://localhost:3000/api/locker/v1/ \
-//   -H 'cache-control: no-cache' \
-//   -H 'content-type: application/x-www-form-urlencoded' \
-//   -d 'api_key=<your key here>&cardhash=00000000&pincode=12345&timestamp=1&action=available'
-
-// experimental code for Concox BL10 lock socket server
-//
-// parse code borrowed from https://gitlab.com/elyez/concox
-
 const net = require('net');
 const util = require('./concox-bl10-util')
 const crc16 = require('crc16-itu')
 const dateFormat = require('dateformat');
 const fs = require('fs');
 
-var bl10 = {};
+const transactions = require('@liskhq/lisk-transactions');
 
+const UpdateBikeLocationTransaction = require('../app/imports/api/lisk-blockchain/transactions/update-bike-location');
+
+// helper functions
+const prefix = (text, prefix) => {
+  return text.split("\n").map((line)=>{ return prefix + line}).join("\n");
+}
+
+const { EPOCH_TIME } = require('@liskhq/lisk-constants');
+
+// Function that generates timestamp
+const getTimestamp = () => {
+  const millisSinceEpoc = Date.now() - Date.parse(EPOCH_TIME);
+  const inSeconds = ((millisSinceEpoc) / 1000).toFixed(0);
+  return  parseInt(inSeconds);
+};
+
+
+// blockchain functions
+const updateBikeLocation = async (client, bikeaccount, latitude, longitude) => {
+  console.log("doing update bike location transaction on the blockchain")
+  // find the bike info on the blockchain
+  let account = undefined;
+  let accountlist = await client.accounts.get({address:bikeaccount.address});
+  if(accountlist.data.length==1) {
+    account = accountlist.data[0];
+  } else {
+    console.log("bike account not found. Please try again");
+    return false;
+  }
+  
+  let asset = {
+      id: bikeaccount.address,
+  }
+  
+  let prevlatitude = account.asset.location ? account.asset.location.latitude : 0;
+  let prevlongitude = account.asset.location ? account.asset.location.longitude : 0;
+    
+  asset.location = {longitude,latitude};
+  asset.prevlocation = {prevlongitude, prevlatitude};
+
+  const tx = new UpdateBikeLocationTransaction({
+    asset,
+    senderPublicKey: bikeaccount.publicKey,
+    recipientId: bikeaccount.address,
+    timestamp: getTimestamp() // dateToLiskEpochTimestamp(new Date()),
+  });
+
+  tx.sign(bikeaccount.passphrase);
+
+  return await client.transactions.broadcast(tx.toJSON());
+}
+
+
+// experimental code for Concox BL10 lock socket server
+// parse code borrowed from https://gitlab.com/elyez/concox
+
+let bl10 = {};
+let themeteorserver = undefined;
+let theapiclient = undefined;
+let bikeapiserver = undefined;
+
+bl10.startBikeApiServer = (meteorserver, apiclient, port = 3005, serverip = '0.0.0.0') => {
+  themeteorserver = meteorserver;
+  theapiclient = apiclient;
+  bikeapiserver = net.createServer(function(socket) {
+    // console.log('incoming bicycle connection from %s',  socket.remoteAddress);
+    socket.tsconnect = new Date();
+    
+    socket.on('data', function(data) {
+      fs.appendFile('received-commands.txt', data.toString('hex')+"\n", function (err) {
+        if (err) throw err;
+      });
+      socket.tsreceived = new Date();
+  		console.log('+++incoming data from %s / %s - %s', socket.remoteAddress, socket.id, socket.tsreceived && socket.tsreceived.toLocaleString());
+      const buf = data.toString('hex');
+      const cmdSplit = buf.split(/(?=7878|7979)/gi)
+      cmdSplit.map( buf => {
+        bl10.processSinglePacket(socket, buf);
+      });
+    });
+  	
+    // if(false==resetsent) {
+    //   console.log("send command");
+    //   // socket.write(bl10.createSendCommand('GPRSSET#'))
+    //   // bikeapiserver:1,app.lisk.bike,9020,0
+    //   // socket.write(bl10.createSendCommand('bikeapiserver,1,app.lisk.bike/api/liskbike,80,0#'))
+  	// 	// socket.write(bl10.createSendCommand('UNLOCK#'))
+    //   resetsent=true;
+    // }
+
+  	// socket.write('Echo bikeapiserver\r\n');
+  	// socket.pipe(socket);
+
+    socket.on('error', function(data) {
+      console.log("socket %s - error %o",socket.id, data);
+    })
+  });
+  
+  console.log('starting concox BL10 bike api server on %s:%s', serverip, port);
+  bikeapiserver.listen(port, serverip);
+}
 
 // createSendCommand()
 //
@@ -107,30 +167,67 @@ bl10.createSendCommand = (command) => {
 
 }
 
-bl10.processInfoContent = async (cmd, infocontent, serialNo, socket, meteorserver = undefined) => {
+bl10.getBlockchainAsset = async(address, showdetails=false) => {
+    // Make connection to the blockchain
+    
+    // console.log("++++++++++++++++++++++++++++++++++++++++++++++");
+    // console.log('fetching blockchain asset data for %s', address)
+
+    // lookup this account
+    let account, description='';
+    let accountlist = await theapiclient.accounts.get({address});
+    if(accountlist.data.length==1) {
+      account = accountlist.data[0];
+      // description = account.address + ' [' + transactions.utils.convertBeddowsToLSK(account.balance) + ' LSK]'
+      // console.log(description);
+      // if(showdetails) {
+      //   console.log(prefix(JSON.stringify(account,0,2), "    "));
+      // }
+      
+      return account;
+    } else {
+      description = address + ' - no account info available';
+      console.log(description);
+      return undefined;
+    }
+}
+
+bl10.getLockInfo = async (id) => {
+  const filterfunc = (object=>{return (object.lock.locktype=='concox-bl10') && (object.lock.lockid==id) })
+  let theLocks = await themeteorserver.collection("objects").filter(filterfunc).fetch();
+  let theLock=undefined;
+  if(theLocks.length==1) theLock = theLocks[0];
+  if(theLock!=undefined) {
+    // console.log('found the lock! HURRAY HURRAY HURRAY! [%s / "%s"]', id, theLock.blockchain.title);
+  } else {
+    console.warn('incoming info from unknown lock %s', id);
+  }
+  
+  return theLock;
+}
+
+bl10.processInfoContent = async (cmd, infocontent, serialNo, socket) => {
   // console.log("==== processing %s/%s", cmd, infocontent)
   if(cmd=='01') { // process login command -> should always come first
     // TODO: decode timezone info
     let imei = infocontent.substr(0,8*2);
-    socket.lockid = imei;
+    socket.id = imei;
   } else {
-    if(!"lockid" in socket) {
+    if(!"id" in socket) {
       console.warn("received command on unnamed socket. Ignoring command");
       return; // should not happen!
     }
   }
   
-  let theLocks = await meteorserver.collection("Objects").find({'lock.locktype': 'concox-bl10', 'lock.lockid': socket.lockid}).fetch();
-  let theLock=undefined;
-  if(theLocks.length==1) theLock = theLocks[0];
-  if(theLock!=undefined) {
-    console.log('found the lock! HURRAY HURRAY HURRAY! [%s]', socket.lockid);
-  } else {
-    console.log('incoming info from undefined lock %s', socket.lockid);
-  }
-  
   let lastts = dateFormat(new Date(), 'yymmddHHMMss', true);
   let lastserial =  serialNo;
+  
+  let lockAsset = undefined
+  let theLock = await bl10.getLockInfo(socket.id);
+  if(theLock!=undefined) {
+    lockAsset = await bl10.getBlockchainAsset(theLock.blockchain.id);
+    // console.log("!!! got blockchain info %o", lockAsset);
+  }
   
   switch(cmd) {
     case '01':  // login packet
@@ -150,13 +247,20 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket, meteorserve
         socket.write(str);
       }
       
+      if(theLock) {
+        await themeteorserver.call('bl10.reconnect', socket.id);
+      }
+      
+      console.log("sending where command")
+      socket.write(bl10.createSendCommand('WHERE#'));
+      
       break;
     case '21': // online command response
       let info = {
         length: infocontent.substr(0*2,1),
         content: new Buffer(infocontent.substr(5*2), 'hex'),
       }
-      console.log("command response from %s (length: %s) [%s]", socket.lockid, info.length, info.content);
+      console.log("command response from %s (length: %s) [%s]", socket.id, info.length, info.content);
       // console.log("source string: %s", new Buffer(infocontent, 'hex'));
       break;
     case '23': // heartbeat package
@@ -183,6 +287,22 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket, meteorserve
         gsmstrength: gsmstrength
       }
       
+      if(lockAsset!=undefined) {
+        if(hbtinfo.locked==true) {
+          if(lockAsset.rentedBy!='') {
+            // send end of rent transaction
+          } else {
+            //
+          }
+        } else {
+          if(lockAsset.rentedBy!='') {
+            // send end of rent transaction
+          }
+        }
+      } else {
+        console.log("unable to compare lock state against the blockchain")
+      }
+      
       // if(theLock!=undefined) {
       //   console.log("%s sent hbtinfo %s", theLock.lock.lockid, JSON.stringify(hbtinfo,0,2));
       //   console.log("doing update for object theLock._id", theLock.lock.lockid, JSON.stringify(hbtinfo,0,2));
@@ -199,7 +319,12 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket, meteorserve
       //   // write lock state to blockchain if changed
       // }
   
-      console.log("heartbeat from %s (locked: %s / charging: %s / gpspositioning: %s / voltage: %s / gsm signal: %s)", socket.lockid, hbtinfo.locked, hbtinfo.charging, hbtinfo.gpspositioning, hbtinfo.voltage, hbtinfo.gsmstrength);
+      // console.log("heartbeat from %s (locked: %s / charging: %s / gpspositioning: %s / voltage: %s / gsm signal: %s)", socket.id, hbtinfo.locked, hbtinfo.charging, hbtinfo.gpspositioning, hbtinfo.voltage, hbtinfo.gsmstrength);
+      
+      if(theLock) {
+        await themeteorserver.call('bl10.heartbeat', socket.id, hbtinfo);
+      }
+      
       break;
     case '32':  // normal location
     case '33':  // alarm location
@@ -238,16 +363,18 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket, meteorserve
         //     'lock.lat_lng_timestamp': new Date() }
         //   });
           console.log("update lock gps location to [%s, %s]",gpsinfo.latitude, gpsinfo.longitude)
+          updateBikeLocation(theapiclient, theLock.wallet, gpsinfo.latitude, gpsinfo.longitude);
+          
         }
 
-        console.log("location from %s (%s)", socket.lockid, JSON.stringify(gpsinfo));
+        console.log("location from %s (%s)", socket.id, JSON.stringify(gpsinfo));
       } else {
-        // console.log("empty location record from %s", socket.lockid);
+        // console.log("empty location record from %s", socket.id);
       }
     
       break;
     default:
-      console.log("unhandled command %s from %s (%s)", cmd, socket.lockid, infocontent)
+      console.log("unhandled command %s from %s (%s)", cmd, socket.id, infocontent)
       break;
     case '98':
       
@@ -310,7 +437,9 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket, meteorserve
   }
 }
 
-bl10.processSinglePacket = async (socket, buf, meteorserver = undefined) => {
+bl10.processSinglePacket = async (socket, buf) => {
+  // console.log("incoming %s", buf.toString());
+  
   let cmd = '';
   let length = 0;
   let infocontent = '';
@@ -332,11 +461,11 @@ bl10.processSinglePacket = async (socket, buf, meteorserver = undefined) => {
     serialNo='';
   }
   
-  console.log('got %s / l: %s / actual: %s', cmd, length, buf.length);
+  // console.log('got %s / l: %s / actual: %s', cmd, length, buf.length);
   
   if(serialNo!='') {
-    await bl10.processInfoContent(cmd, infocontent, serialNo, socket, meteorserver)
-    let line = socket.lockid + ";" + serialNo + ";" + cmd + ";" + infocontent+"\n";
+    await bl10.processInfoContent(cmd, infocontent, serialNo, socket)
+    let line = socket.id + ";" + serialNo + ";" + cmd + ";" + infocontent+"\n";
     fs.appendFile('received-commands.txt', line, function (err) {
       if (err) throw err;
     });
