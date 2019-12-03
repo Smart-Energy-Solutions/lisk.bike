@@ -286,23 +286,24 @@ if(Meteor.isServer) {
       console.log("calling createnew")
       let newObject = createObject();
       let newId = Objects.insert(newObject);
-      return { _id: newId }
+      return { walletAddress: newObject.wallet.address }
     },
     'objects.applychanges'(_id, changes) {
       return doApplyChanges(_id, changes);
     },
-    'objects.remove'(objectId){
-      var object = Objects.findOne(objectId);
+    'objects.remove'(_id){
+      var object = Objects.findOne(_id);
 
-      Objects.remove(objectId);
+      Objects.remove(_id);
 
       var description = 'Object ' + object.blockchain.title + ' was removed';
       console.log(description);
     },
-    async 'objects.registeronblockchain'(objectId){
+    async 'objects.registeronblockchain'(walletAddress){
       
-      var object = Objects.findOne(objectId);
+      var object = Objects.findOne({'wallet.address':walletAddress});
       
+      console.log("searched for %s - found %o", walletAddress, object)
       if(object.blockchain.title=='') {
         return { result: false, message: 'please provide a title for this object!'}
       } else if(object.blockchain.description=='') {
@@ -338,7 +339,8 @@ if(Meteor.isServer) {
       const broadcastTx = client.transactions.broadcast(tx.toJSON());
       
       broadcastTx.then(() => {
-        Objects.update(objectId, {$set: {'blockchain.id': object.wallet.address}});
+        console.log("bike %s confirmed on the blockchain", walletAddress)
+        Objects.update({'wallet.address':walletAddress}, {$set: {'blockchain.id': walletAddress}});
       })
       .catch(error => {
         console.error(error);

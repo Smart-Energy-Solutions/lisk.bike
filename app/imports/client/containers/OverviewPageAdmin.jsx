@@ -70,9 +70,9 @@ class OverviewPageAdmin extends Component {
       return false;
     }
 
-      if(result._id!=undefined) {
+      if(result.walletAddress!=undefined) {
         this.setState((prevstate) => {
-          return { redirect: '/admin/object/' + result._id }
+          return { redirect: '/admin/object/' + result.walletAddress }
         });
       }
   }

@@ -47,7 +47,7 @@ const UserAppAdminAdminUsersList = () => (<UserApp content={<AdminUsersList />} 
 
 const UserAppAdminOverviewPage = () => (<UserApp content={<OverviewPageAdmin showMap={true} showList={true} adminmode={true} />} />)
 
-const UserAppAdminEditObject = ({match}) => (<UserApp content={<EditObject  objectId={match.params.objectId}/>} />)
+const UserAppAdminEditObject = ({match}) => (<UserApp content={<EditObject  walletAddress={match.params.walletAddress}/>} />)
 
 const UserAppSystemSettings = () => (<UserApp content={<SystemSettings />} />)
 
@@ -114,7 +114,7 @@ class AppRoutes extends React.Component {
 
       <RouteWhenLoggedIn path='/admin/users' component={UserAppAdminAdminUsersList}/>
       <RouteWhenLoggedIn path='/admin/objects' component={UserAppAdminOverviewPage}/>
-      <RouteWhenLoggedIn path='/admin/object/:objectId' component={UserAppAdminEditObject}/>
+      <RouteWhenLoggedIn path='/admin/object/:walletAddress' component={UserAppAdminEditObject}/>
       
       <RouteWhenLoggedIn path='/systemsettings' component={UserAppSystemSettings}/>
       <RouteWhenLoggedIn path='/admin/log' component={UserAppLogList}/>

@@ -68,8 +68,8 @@ class EditObject extends Component {
     // ask the Blockchain to send the latest settings
   }
 
-  sendSettingsToBlockchain(objectId) {
-    Meteor.call('objects.registeronblockchain', objectId, this.processSendSettingsToBlockchainResult);
+  sendSettingsToBlockchain(walletAddress) {
+    Meteor.call('objects.registeronblockchain', walletAddress, this.processSendSettingsToBlockchainResult);
   }
   
   processSendSettingsToBlockchainResult(error, result) {
@@ -90,7 +90,7 @@ class EditObject extends Component {
 
   // Function that registers the bike onto a blockchain
   registerBikeOnTheBlockchain = async (err, res) => {
-    const { object, objectId } = this.props;
+    const { object, walletAddress } = this.props;
 
     // Check for errors
     if(err) {
@@ -115,7 +115,7 @@ class EditObject extends Component {
     // Register bike on the blockchain..
     // ..as soon as seeding is processed by the blockchain.
     setTimeout(() => {
-      this.sendSettingsToBlockchain(objectId)
+      this.sendSettingsToBlockchain(walletAddress)
     }, 10000)
   }
 
@@ -435,8 +435,10 @@ export default withTracker((props) => {
   Meteor.subscribe('objects');
   Meteor.subscribe('settings');
   
+  console.log("got wallet address %s", props.walletAddress);
+  
   let isnew = false;
-  let object = Objects.findOne({'wallet.address': props.objectId})
+  let object = Objects.findOne({'wallet.address': props.walletAddress})
   if(undefined==object) {
     let settings = getSettingsClientSide();
     if(settings) {

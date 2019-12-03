@@ -186,14 +186,16 @@ class MiniMap extends Component {
 }
 
 MiniMap.propTypes = {
+  bikeAddress: PropTypes.string,
   lat_lng: PropTypes.array,
   updatelocation: PropTypes.any,
   objectislocked: PropTypes.bool
 };
 
 MiniMap.defaultProps = {
+  bikeAddress: "",
   lat_lng: [0,0],
-  updatelocation: PropTypes.any,
+  updatelocation: undefined,
   objectislocked: true
 }
 
