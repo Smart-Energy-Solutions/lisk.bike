@@ -9,7 +9,7 @@ const transactions = require('@liskhq/lisk-transactions');
 const UpdateBikeLocationTransaction = require('../app/imports/api/lisk-blockchain/transactions/update-bike-location');
 const ReturnBikeTransaction = require('../app/imports/api/lisk-blockchain/transactions/return-bike');
 
-let sockets = [];
+var sockets = [];
 
 // helper functions
 const prefix = (text, prefix) => {
@@ -169,7 +169,7 @@ bl10.createSendCommand = (command) => {
   ])
 
   const hexstring = crc16(
-    Buffer.from.concat([
+    Buffer.concat([
       lengthOfDataBit,
       protocolNumber,
       lengthOfCommand,
@@ -183,7 +183,7 @@ bl10.createSendCommand = (command) => {
   const errorCheck = Buffer.from(hexstring, 'hex');
   const stopBit = Buffer.from([0x0D, 0x0A]);
 
-  return Buffer.from.concat([
+  return Buffer.concat([
     startBit,
     lengthOfDataBit,
     protocolNumber,
@@ -244,6 +244,7 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket) => {
     let imei = infocontent.substr(0,8*2);
     socket.id = imei;
 
+    console.log('store socket with id %s', imei);
     sockets[imei] = socket;
   } else {
     if(!"id" in socket) {
@@ -339,9 +340,9 @@ bl10.processInfoContent = async (cmd, infocontent, serialNo, socket) => {
       // } else {
       //   console.log("unable to compare lock state against the blockchain")
       // }
-          
+      
       if(theLock) {
-        // console.log("$$$$ updating lock %s with %o", theLock.id, hbtinfo);
+        console.log("$$$$ updating lock %s with %o", theLock.id, hbtinfo);
         await themeteorserver.call('bl10.updateinfo', theLock.id, hbtinfo, cApiToken);
       } else {
         console.log("no lock info for %s", socket.id);
@@ -581,7 +582,7 @@ bl10.checkRentalStateForLock = async (theLock) => {
   }
   
   // compare blockchain state to lock state
-  // console.log("check rental state for lock %s", theLock.blockchain.title)
+  console.log("check rental state for lock %s", theLock.blockchain.title)
   // console.log("  - accountinfo.asset.rentedBy: %s", accountinfo.asset.rentedBy)
   // console.log("  - theLock.lock.locked: %s", theLock.lock.locked)
   // console.log("accountinfo %o:", accountinfo)
@@ -600,7 +601,14 @@ bl10.checkRentalStateForLock = async (theLock) => {
     
 		asocket.write(bl10.createSendCommand('UNLOCK#'));
   } else {
-    // console.log("check rental state for lock %s - no action required", theLock.blockchain.title);
+    // // console.log("check rental state for lock %s - no action required", theLock.blockchain.title);
+    // let asocket = sockets[theLock.lock.lockid];
+    // if(undefined!=asocket) {
+    //   console.log("send lock command")
+    //   // asocket.write(bl10.createSendCommand('RESET#'))
+    // } else {
+    //   console.log('lock not found');
+    // }
   }
 }
 
@@ -609,7 +617,7 @@ bl10.checkRentalState = async () => {
   // console.log("start rental check cycle for all my locks")
   const filterfunc = (object=>{return (object.lock.locktype=='concox-bl10' && object.blockchain.id!='') });
   let theLocks = await themeteorserver.collection("objects").filter(filterfunc).fetch();
-  theLocks.forEach(async lock=>{ await bl10.checkRentalStateForLock(lock)});
+  await theLocks.forEach(async lock=>{ await bl10.checkRentalStateForLock(lock)});
   
   setTimeout(bl10.checkRentalState, 5000);
 }
